@@ -11,7 +11,9 @@ Thanks for trying the ztrip beta. This archive holds:
   `find_package(ztrip CONFIG REQUIRED)` and link `ztrip::core`.
 - `examples/`: Motion Graph files (`.mgraph.json`).
 - `docs/`: architecture, node reference and design decisions.
-- `licenses/`: licenses of third-party code compiled into ztrip.
+- `LICENSE`: ztrip's MIT license. `THIRD_PARTY_NOTICES.md` and `licenses/`:
+  licenses of third-party code compiled into ztrip. `PRIVACY.md`: ztrip
+  collects no data.
 - `godot/`: the Godot 4.5+ demo project with the ztrip addon already built
   into `addons/ztrip/bin/`.
   In Godot's Project Manager choose **Import** and open `godot/project.godot`,

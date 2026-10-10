@@ -1,9 +1,22 @@
 name: CI
 
+# Every push and pull request builds Linux GCC, Linux Clang and Windows MSVC
+# (Debug and Release) and the Godot host on Linux and Windows. Docs-only
+# changes skip it, superseded runs are cancelled, and compiles (ccache) and the
+# FetchContent downloads are cached; caches are written from main, which pull
+# requests can read.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - docs/**
+      - LICENSE*
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - docs/**
+      - LICENSE*
   workflow_dispatch:
 
 concurrency:
@@ -12,6 +25,10 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  CMAKE_C_COMPILER_LAUNCHER: ccache
+  CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
 jobs:
   build:
@@ -38,6 +55,9 @@ jobs:
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: ilammy/msvc-dev-cmd@v1
@@ -45,8 +65,20 @@ jobs:
       - name: Install Ninja and ALSA headers
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ninja-build libasound2-dev
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: build-${{ matrix.os }}-${{ matrix.cc }}-${{ matrix.preset }}
+          max-size: 500M
+          save: ${{ github.event_name != 'pull_request' }}
+      - uses: actions/cache@v4
+        with:
+          # The downloaded sources only; the dependency builds come from ccache.
+          path: |
+            build/${{ matrix.preset }}/_deps
+            !build/${{ matrix.preset }}/_deps/*-build
+          key: fetchcontent-${{ matrix.preset }}-${{ matrix.os }}-${{ hashFiles('cmake/ZtripDependencies.cmake', 'tests/CMakeLists.txt') }}
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }}
+        run: cmake --preset ${{ matrix.preset }} -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }}
       - name: Test
@@ -60,16 +92,9 @@ jobs:
         include:
           - name: Linux
             os: ubuntu-24.04
-            cc: gcc
-            cxx: g++
           - name: Windows
             os: windows-2022
-            cc: cl
-            cxx: cl
     runs-on: ${{ matrix.os }}
-    env:
-      CC: ${{ matrix.cc }}
-      CXX: ${{ matrix.cxx }}
     defaults:
       run:
         shell: bash
@@ -77,11 +102,30 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
+      - name: Set the compiler
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "CC=cl" >> "$GITHUB_ENV"; echo "CXX=cl" >> "$GITHUB_ENV"
+          else
+            echo "CC=gcc" >> "$GITHUB_ENV"; echo "CXX=g++" >> "$GITHUB_ENV"
+          fi
       - name: Install Ninja and ALSA headers
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ninja-build libasound2-dev
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: godot-${{ matrix.os }}
+          max-size: 500M
+          save: ${{ github.event_name != 'pull_request' }}
+      - uses: actions/cache@v4
+        with:
+          # The downloaded sources only; the dependency builds come from ccache.
+          path: |
+            build/godot/_deps
+            !build/godot/_deps/*-build
+          key: fetchcontent-godot-${{ matrix.os }}-${{ hashFiles('cmake/ZtripDependencies.cmake', 'tests/CMakeLists.txt', 'hosts/godot/CMakeLists.txt') }}
       - name: Configure
-        run: cmake --preset godot
+        run: cmake --preset godot -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
       - name: Build
         run: cmake --build --preset godot
       - name: Test core
@@ -112,6 +156,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ztrip-godot-${{ runner.os }}
+          retention-days: 7
           path: |
             hosts/godot/project
             !hosts/godot/project/.godot
