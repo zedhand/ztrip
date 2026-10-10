@@ -12,6 +12,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ZTRIP_BUILD_TOOLS "Build command-line tools" ON)
 option(ZTRIP_BUILD_TESTS "Build unit tests" ON)
+option(ZTRIP_BUILD_GODOT "Build the Godot 4 GDExtension host (fetches godot-cpp)" OFF)
+
+if(ZTRIP_BUILD_GODOT)
+  # The extension is a shared library that links ztrip_core statically, so
+  # everything must be position independent and, on MSVC, use the static
+  # runtime that godot-cpp links by default.
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "MSVC runtime library" FORCE)
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(ZtripWarnings)
@@ -21,6 +30,10 @@ add_subdirectory(core)
 
 if(ZTRIP_BUILD_TOOLS)
   add_subdirectory(tools/analyze-cli)
+endif()
+
+if(ZTRIP_BUILD_GODOT)
+  add_subdirectory(hosts/godot)
 endif()
 
 if(ZTRIP_BUILD_TESTS)
