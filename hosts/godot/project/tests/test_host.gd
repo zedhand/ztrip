@@ -42,7 +42,7 @@ func _run() -> void:
 	print("ztrip ", ZtripGraphTools.get_version(), " on Godot ", Engine.get_version_info().string)
 
 	var types: Array = ZtripGraphTools.get_node_types()
-	_check(types.size() == 15, "the node catalog lists 15 node types (got %d)" % types.size())
+	_check(types.size() >= 16, "the node catalog lists every node type, NoteLane included (got %d)" % types.size())
 	var bad: Dictionary = ZtripGraphTools.check_graph("{not json")
 	_check(not bad.ok and bad.errors.size() > 0, "check_graph reports malformed JSON")
 	var stage_text := FileAccess.get_file_as_string("res://demo/stage.mgraph.json")

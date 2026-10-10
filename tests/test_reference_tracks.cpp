@@ -4,6 +4,8 @@
 // 01_four_on_the_floor_128bpm.wav and its .truth.json (and optionally 02/03).
 #include "ztrip/analysis/offline.hpp"
 #include "ztrip/io/wav.hpp"
+#include "ztrip/time/autodraft.hpp"
+#include "ztrip/time/tempo_map.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -133,4 +135,27 @@ TEST_CASE("tracks 02 and 03 find the tempo a listener claps to", "[reference]") 
         CHECK(static_cast<double>(r.beats.beats.size()) > 0.8 * r.duration_s * r.beats.bpm / 60.0);
     }
     if (ran == 0) SKIP("tracks 02/03 not present");
+}
+
+TEST_CASE("track 01: the auto-drafted kick lane lands within 20 ms of true kicks", "[reference][time]") {
+    const fs::path dir = reference_dir();
+    const fs::path wav = dir / "01_four_on_the_floor_128bpm.wav";
+    const fs::path truth = dir / "01_four_on_the_floor_128bpm.truth.json";
+    if (dir.empty() || !fs::exists(wav) || !fs::exists(truth)) {
+        SKIP("set ZTRIP_REFERENCE_TRACKS to the reference-tracks folder to run");
+    }
+    const auto r = analysis::analyze(io::read_wav(wav), {});
+    const auto tempo = time::tempo_map_from_beats(r.beats);
+    const auto seq = time::auto_draft(r, tempo);
+    const auto* lane = seq.find_lane("Kick");
+    REQUIRE(lane);
+
+    std::vector<analysis::Trigger> drafted;
+    for (const auto& n : lane->notes) drafted.push_back({tempo.seconds_at(n.start_beat), n.velocity});
+    const Score kick = score(drafted, truth_times(truth, "kick"), 0.020);
+    INFO("drafted kick lane: " << drafted.size() << " notes, P=" << kick.precision << " R=" << kick.recall
+                               << " err=" << kick.mean_abs_error);
+    CHECK(kick.recall >= 0.95);
+    CHECK(kick.precision >= 0.90);
+    CHECK(kick.mean_abs_error < 0.010);
 }
