@@ -40,6 +40,14 @@ public:
     // checkpoints, since earlier state was computed from other signals.
     void bind_source(std::string slot, const analysis::AnalysisResult* result);
 
+    // Binds a tempo map (BeatClock and NoteLane read it in place of the
+    // analysed beat grid) or a Note Sequence to a slot; null unbinds. Like
+    // bind_source this clears checkpoints. Nodes resolve notes to seconds
+    // when bound, so after editing a bound tempo map or sequence, bind it
+    // again.
+    void bind_tempo(std::string slot, const time::TempoMap* tempo);
+    void bind_sequence(std::string slot, const time::NoteSequence* sequence);
+
     // Sets a macro, clamped to its range. Returns false for unknown names.
     // Clears checkpoints: playing on continues from the current state, while
     // a seek, or evaluating the current time again, replays with the new value.

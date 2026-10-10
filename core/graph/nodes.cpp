@@ -1,6 +1,8 @@
 // The v1 essential node catalog. See docs/NODES.md for the reference.
 #include "ztrip/analysis/offline.hpp"
 #include "ztrip/graph/registry.hpp"
+#include "ztrip/time/note_sequence.hpp"
+#include "ztrip/time/tempo_map.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -96,6 +98,7 @@ class BeatClockNode final : public Node {
 public:
     explicit BeatClockNode(const NodeSetup& s) : slot_(s.string("source")) {}
     void bind(const SourceSet& sources) override {
+        tempo_ = sources.find_tempo(slot_);
         const auto* r = sources.find(slot_);
         grid_ = (r && r->beats.beats.size() >= 2) ? &r->beats : nullptr;
     }
@@ -103,6 +106,19 @@ public:
         enum { kClock, kBeat, kBar, kBeatPhase, kBarPhase };
         double per_bar = 4.0;
         double pos = 0.0;
+        if (tempo_) {
+            // A bound tempo map wins over the analysed grid: it carries the
+            // user's offset, nudge and meter changes.
+            pos = tempo_->beat_at(ctx.time);
+            const double prev = tempo_->beat_at(static_cast<double>(ctx.step - 1) / ctx.rate_hz);
+            const time::MusicalPosition now = tempo_->position_at(pos);
+            if (std::floor(pos) > std::floor(prev)) io.out[kBeat] = {1.0, true};
+            if (now.bar > tempo_->position_at(prev).bar) io.out[kBar] = {1.0, true};
+            io.out[kClock].v = pos;
+            io.out[kBeatPhase].v = now.beat_phase;
+            io.out[kBarPhase].v = now.bar_phase;
+            return;
+        }
         if (grid_) {
             per_bar = std::max(1, grid_->beats_per_bar);
             pos = position(ctx.time) - grid_->downbeat_phase;
@@ -144,7 +160,41 @@ private:
     }
 
     std::string slot_;
+    const time::TempoMap* tempo_ = nullptr;
     const analysis::BeatGrid* grid_ = nullptr;
+};
+
+class NoteLaneNode final : public Node {
+public:
+    explicit NoteLaneNode(const NodeSetup& s)
+        : slot_(s.string("source")), sequence_slot_(s.string("sequence")), lane_(s.string("lane")) {}
+    void bind(const SourceSet& sources) override {
+        const time::TempoMap* tempo = sources.find_tempo(slot_);
+        if (!tempo) {
+            // No tempo map: follow the analysed beats, else a steady 120 BPM.
+            const auto* r = sources.find(slot_);
+            fallback_ = r ? time::tempo_map_from_beats(r->beats) : time::TempoMap();
+            tempo = &fallback_;
+        }
+        const auto* seq = sources.find_sequence(sequence_slot_);
+        const auto* lane = seq ? seq->find_lane(lane_) : nullptr;
+        timeline_ = lane ? time::LaneTimeline(*seq, *lane, *tempo) : time::LaneTimeline();
+    }
+    void evaluate(const EvalContext& ctx, NodeIO& io) const override {
+        enum { kGate, kTrigger, kEnvelope, kVelocity };
+        const double t0 = static_cast<double>(ctx.step - 1) / ctx.rate_hz;
+        const bool held = timeline_.gate(ctx.time);
+        io.out[kGate].v = held ? 1.0 : 0.0;
+        if (const auto* n = timeline_.started_in(t0, ctx.time)) io.out[kTrigger] = {clamp01(n->note->velocity), true};
+        io.out[kEnvelope].v = timeline_.envelope(ctx.time);
+        const auto* cur = held ? timeline_.current(ctx.time) : nullptr;
+        io.out[kVelocity].v = cur ? clamp01(cur->note->velocity) : 0.0;
+    }
+
+private:
+    std::string slot_, sequence_slot_, lane_;
+    time::TempoMap fallback_;
+    time::LaneTimeline timeline_;
 };
 
 class ConstantNode final : public Node {
@@ -417,6 +467,11 @@ void register_builtin_nodes(NodeRegistry& r) {
                 {"bar_phase", C::Continuous}},
            {text("source", "main"), number("bpm", 120.0), number("beats_per_bar", 4.0)},
            0, false, factory<BeatClockNode>()});
+    r.add({"NoteLane", "Sources", "Gate, trigger, envelope and velocity from one lane of a Note Sequence.",
+           {}, {{"gate", C::Continuous}, {"trigger", C::Trigger}, {"envelope", C::Continuous},
+                {"velocity", C::Continuous}},
+           {text("source", "main"), text("sequence", "main"), text("lane", "Kick")},
+           0, false, factory<NoteLaneNode>()});
     r.add({"Constant", "Sources", "A fixed value.", {}, {{"out", C::Continuous}}, {number("value", 0.0)},
            0, false, factory<ConstantNode>()});
 
