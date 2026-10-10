@@ -3,6 +3,7 @@
 #include "ztrip/analysis/bands.hpp"
 #include "ztrip/analysis/beats.hpp"
 #include "ztrip/analysis/envelope.hpp"
+#include "ztrip/analysis/kick.hpp"
 #include "ztrip/analysis/onsets.hpp"
 #include "ztrip/analysis/stft.hpp"
 #include "ztrip/io/wav.hpp"
@@ -20,6 +21,7 @@ struct AnalysisSettings {
     std::vector<Band> bands = default_bands();
     EnvelopeSettings envelope;
     OnsetSettings onsets;
+    KickSettings kick;
     BeatSettings beats;
     double signal_rate_hz = 120.0;
 };
@@ -41,7 +43,8 @@ struct EventList {
 //   env.<Band>   band energy after the attack/release envelope follower
 //   rms          loudness, dB normalised to 0..1
 //   centroid     spectral centroid, log-frequency 20 Hz..20 kHz mapped to 0..1
-// Events are onset.<Band>, onset.full, beat and downbeat.
+// Events are onset.<Band>, onset.full, kick (the dedicated kick detector),
+// beat and downbeat.
 struct AnalysisResult {
     double signal_rate_hz = 120.0;
     double duration_s = 0.0;

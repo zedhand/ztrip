@@ -94,6 +94,13 @@ TEST_CASE("track 01: kicks, beats and downbeats match ground truth", "[reference
     CHECK(kick.precision >= 0.80);
     CHECK(kick.mean_abs_error < 0.010);
 
+    // Phase 4 exit: the kick lane lands within 20 ms of every true hit.
+    const Score kicks = score(r.find_events("kick")->events, truth_times(truth, "kick"), 0.020);
+    INFO("kick detector P=" << kicks.precision << " R=" << kicks.recall << " err=" << kicks.mean_abs_error);
+    CHECK(kicks.recall >= 0.99);
+    CHECK(kicks.precision >= 0.99);
+    CHECK(kicks.mean_abs_error < 0.003);
+
     const Score hats = score(r.find_events("onset.Air")->events, truth_times(truth, "hat"), 0.030);
     INFO("Air vs hat P=" << hats.precision << " R=" << hats.recall);
     CHECK(hats.recall >= 0.95);
