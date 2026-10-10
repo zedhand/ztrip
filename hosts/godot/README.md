@@ -67,6 +67,9 @@ project, enable *ztrip* under Project Settings > Plugins, then:
 | `active` | Off puts every driven property back to the value it had before. |
 | `playing`, `time` | Play/stop, and the song position in seconds (drag it to scrub). |
 | `autoplay` | Play from the start when the game runs. |
+| `live_input` | Drive the graph from live audio instead of the song (see below). |
+| `live_device`, `live_loopback`, `live_gain_db` | Which input: empty for the default microphone, or a device name (or part of one); `live_loopback` records what the computer plays instead. |
+| `live_simulate_file` | A WAV played into the live input in real time, looping, to try a live setup without a microphone. |
 | `macros/*` | One slider per macro the graph exposes. Saved with the scene. |
 | `status` | What was loaded, how many targets are bound, and anything wrong. |
 
@@ -86,6 +89,22 @@ notes live.
 `ZtripAnalysis` analyses a WAV on its own (`load_file`, `get_bpm`,
 `get_beats`, `get_event_times("onset.Sub")`, `sample("env.Bass", t)`), and
 `ZtripGraphTools` lists node types and checks graphs.
+
+### Live input
+
+Turn on `live_input` and press `playing` (or use `autoplay`): the graph's
+`main` slot then reads live audio, analysed as it arrives, with the same
+signal names as a song (`band.*`, `env.*`, `rms`, `centroid`, `onset.*`), so
+the same graph works on both. The microphone is opened only while playing.
+`ZtripPlayer.get_live_devices()` lists inputs as `{name, default, loopback}`
+dictionaries. Loopback records an output with WASAPI on Windows and uses the
+output's "Monitor of" source on Linux (PulseAudio or PipeWire).
+
+Live analysis adds about 12-15 ms before an onset is known, on top of the
+sound card's own buffer. Live input has no beat grid or kick detector yet:
+use `AudioOnset` on `Sub` with `min_velocity` around 0.3 for kicks, and
+`BeatClock` runs at its `bpm` param. `NoteLane` stays silent, since the
+timeline belongs to the song.
 
 ### Target paths
 
@@ -170,7 +189,7 @@ overwrites edits made in the editor).
 - WAV only, and Godot itself only plays plain PCM WAVs: files saved as
   `WAVE_FORMAT_EXTENSIBLE` (common for 24-bit) import with an error. Re-save
   them, e.g. `ffmpeg -i in.wav -c:a pcm_s16le out.wav`.
-- One song per player, bound to the graph's `main` source slot.
+- One song (or one live input) per player, bound to the graph's `main` source slot.
 - Targets take one number each; colours and vectors are driven per component.
 - Graph layers and blend modes, undo/redo in the Motion Graph panel and
   sparkline previews come in later phases.

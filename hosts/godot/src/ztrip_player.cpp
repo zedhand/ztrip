@@ -17,6 +17,8 @@
 #include <chrono>
 #include <cmath>
 #include <exception>
+#include <span>
+#include <stdexcept>
 
 namespace godot {
 
@@ -67,6 +69,18 @@ void ZtripPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_use_cache", "use_cache"), &ZtripPlayer::set_use_cache);
     ClassDB::bind_method(D_METHOD("is_using_cache"), &ZtripPlayer::is_using_cache);
     ClassDB::bind_method(D_METHOD("get_status"), &ZtripPlayer::get_status);
+    ClassDB::bind_method(D_METHOD("set_live_input", "live"), &ZtripPlayer::set_live_input);
+    ClassDB::bind_method(D_METHOD("is_live_input"), &ZtripPlayer::is_live_input);
+    ClassDB::bind_method(D_METHOD("set_live_device", "device"), &ZtripPlayer::set_live_device);
+    ClassDB::bind_method(D_METHOD("get_live_device"), &ZtripPlayer::get_live_device);
+    ClassDB::bind_method(D_METHOD("set_live_loopback", "loopback"), &ZtripPlayer::set_live_loopback);
+    ClassDB::bind_method(D_METHOD("is_live_loopback"), &ZtripPlayer::is_live_loopback);
+    ClassDB::bind_method(D_METHOD("set_live_simulate_file", "path"), &ZtripPlayer::set_live_simulate_file);
+    ClassDB::bind_method(D_METHOD("get_live_simulate_file"), &ZtripPlayer::get_live_simulate_file);
+    ClassDB::bind_method(D_METHOD("set_live_gain_db", "gain"), &ZtripPlayer::set_live_gain_db);
+    ClassDB::bind_method(D_METHOD("get_live_gain_db"), &ZtripPlayer::get_live_gain_db);
+    ClassDB::bind_method(D_METHOD("is_live_running"), &ZtripPlayer::is_live_running);
+    ClassDB::bind_static_method("ZtripPlayer", D_METHOD("get_live_devices"), &ZtripPlayer::get_live_devices);
 
     ClassDB::bind_method(D_METHOD("play", "from"), &ZtripPlayer::play, DEFVAL(-1.0));
     ClassDB::bind_method(D_METHOD("stop"), &ZtripPlayer::stop);
@@ -108,6 +122,15 @@ void ZtripPlayer::_bind_methods() {
                  "set_tempo_file", "get_tempo_file");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "sequence_file", PROPERTY_HINT_SAVE_FILE, "*.nseq.json"),
                  "set_sequence_file", "get_sequence_file");
+    ADD_GROUP("Live input", "live_");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "live_input"), "set_live_input", "is_live_input");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "live_device", PROPERTY_HINT_PLACEHOLDER_TEXT, "default input"),
+                 "set_live_device", "get_live_device");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "live_loopback"), "set_live_loopback", "is_live_loopback");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "live_simulate_file", PROPERTY_HINT_FILE, "*.wav"),
+                 "set_live_simulate_file", "get_live_simulate_file");
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "live_gain_db", PROPERTY_HINT_RANGE, "-24,24,0.5,suffix:dB"),
+                 "set_live_gain_db", "get_live_gain_db");
     ADD_GROUP("Playback", "");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "active"), "set_active", "is_active");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR),
@@ -196,6 +219,18 @@ void ZtripPlayer::set_time(double t) { seek(t); }
 
 String ZtripPlayer::get_status() const {
     PackedStringArray lines;
+    if (live_input_) {
+        if (!live_error_.is_empty()) {
+            lines.push_back("Live: " + live_error_);
+        } else if (live_) {
+            lines.push_back(String("Live: {0} at {1} Hz, {2} s").format(Array::make(
+                to_godot(live_->source_name()), live_->analyzer().sample_rate(), String::num(live_->time(), 1))));
+            if (live_->dropped() > 0)
+                lines.push_back(String("Live: {0} samples dropped").format(Array::make(static_cast<int64_t>(live_->dropped()))));
+        } else {
+            lines.push_back("Live: starts on play.");
+        }
+    }
     if (!analysis_error_.is_empty()) lines.push_back("Audio: " + analysis_error_);
     if (!graph_error_.is_empty()) lines.push_back("Graph: " + graph_error_);
     if (pending_.valid()) lines.push_back("Analysing " + pending_file_.get_file() + "...");
@@ -238,9 +273,10 @@ String ZtripPlayer::get_status() const {
 PackedStringArray ZtripPlayer::_get_configuration_warnings() const {
     PackedStringArray out;
     if (graph_file_.is_empty()) out.push_back("Set graph_file to a .mgraph.json Motion Graph.");
-    if (audio_file_.is_empty() && audio_player_.is_empty())
+    if (audio_file_.is_empty() && audio_player_.is_empty() && !live_input_)
         out.push_back("Set audio_player (an AudioStreamPlayer playing a WAV) or audio_file.");
     if (!analysis_error_.is_empty()) out.push_back(analysis_error_);
+    if (!live_error_.is_empty()) out.push_back(live_error_);
     if (!graph_error_.is_empty()) out.push_back(graph_error_);
     for (const auto& p : binder_.problems()) out.push_back(p);
     return out;
@@ -339,8 +375,8 @@ void ZtripPlayer::start_analysis() {
     analysis_error_ = String();
     const String file = resolve_audio_file();
     if (file.is_empty()) {
-        if (evaluator_) evaluator_->bind_source("main", nullptr);
         analysis_.reset();
+        if (evaluator_) evaluator_->bind_source("main", main_source());
         analysis_ref_.unref();
         resolved_audio_file_ = String();
         set_status_changed();
@@ -378,8 +414,8 @@ void ZtripPlayer::finish_analysis(ztrip::godot_host::AnalysisOutcome outcome) {
         set_status_changed();
         return;
     }
-    if (evaluator_) evaluator_->bind_source("main", outcome.result.get());
     analysis_ = std::move(outcome.result);
+    if (evaluator_) evaluator_->bind_source("main", main_source());
     resolved_audio_file_ = pending_file_;
     analysis_ref_.instantiate();
     analysis_ref_->set_result(analysis_, resolved_audio_file_, outcome.from_cache);
@@ -435,8 +471,10 @@ void ZtripPlayer::reload_graph() {
         } else if (evaluator_) {
             evaluator_->swap_graph(std::move(compiled.graph));
         } else {
-            evaluator_ = std::make_unique<ztrip::graph::Evaluator>(std::move(compiled.graph));
-            evaluator_->bind_source("main", analysis_.get());
+            ztrip::graph::EvaluatorSettings settings;
+            settings.live = live_ != nullptr;
+            evaluator_ = std::make_unique<ztrip::graph::Evaluator>(std::move(compiled.graph), settings);
+            evaluator_->bind_source("main", main_source());
             bind_timeline();
         }
     } catch (const std::exception& e) {
@@ -528,6 +566,13 @@ Error ZtripPlayer::save_timeline() {
 
 void ZtripPlayer::bind_timeline() {
     if (!evaluator_) return;
+    if (live_) {
+        // The song's timeline means nothing to live input: BeatClock runs on
+        // its own tempo and NoteLane stays silent.
+        evaluator_->bind_tempo("main", nullptr);
+        evaluator_->bind_sequence("main", nullptr);
+        return;
+    }
     evaluator_->bind_tempo("main", has_tempo_ ? &timeline_->tempo() : nullptr);
     evaluator_->bind_sequence("main", &timeline_->sequence());
 }
@@ -544,9 +589,119 @@ void ZtripPlayer::set_status_changed() {
     notify_property_list_changed();
 }
 
+// ---- Live input ----------------------------------------------------------------
+
+void ZtripPlayer::set_live_input(bool live) {
+    if (live == live_input_) return;
+    live_input_ = live;
+    if (!live_input_) {
+        stop_live();
+        playing_ = false;
+    } else if (playing_) {
+        // Switching a playing song over to live input.
+        stop();
+        play();
+    }
+    set_status_changed();
+}
+
+void ZtripPlayer::set_live_device(const String& device) {
+    if (device == live_device_) return;
+    live_device_ = device;
+    restart_live();
+}
+
+void ZtripPlayer::set_live_loopback(bool loopback) {
+    if (loopback == live_loopback_) return;
+    live_loopback_ = loopback;
+    restart_live();
+}
+
+void ZtripPlayer::set_live_simulate_file(const String& path) {
+    if (path == live_simulate_file_) return;
+    live_simulate_file_ = path;
+    restart_live();
+}
+
+void ZtripPlayer::set_live_gain_db(double gain) {
+    if (gain == live_gain_db_) return;
+    live_gain_db_ = gain;
+    restart_live();
+}
+
+Array ZtripPlayer::get_live_devices() {
+    Array out;
+    for (const auto& d : ztrip::io::list_capture_devices()) {
+        Dictionary info;
+        info["name"] = to_godot(d.name);
+        info["default"] = d.is_default;
+        info["loopback"] = d.loopback;
+        out.push_back(info);
+    }
+    return out;
+}
+
+const ztrip::analysis::AnalysisResult* ZtripPlayer::main_source() const {
+    return live_ ? &live_->result() : analysis_.get();
+}
+
+void ZtripPlayer::restart_live() {
+    if (!live_) return;
+    stop_live();
+    start_live();
+}
+
+void ZtripPlayer::start_live() {
+    live_error_ = String();
+    ztrip::analysis::LiveSettings settings;
+    settings.gain_db = static_cast<float>(live_gain_db_);
+    try {
+        if (!live_simulate_file_.is_empty()) {
+            const PackedByteArray bytes = FileAccess::get_file_as_bytes(live_simulate_file_);
+            if (bytes.is_empty()) throw std::runtime_error("cannot read " + to_std(live_simulate_file_));
+            const auto audio = ztrip::io::parse_wav(std::span<const std::uint8_t>(bytes.ptr(), bytes.size()));
+            live_ = std::make_unique<ztrip::io::LiveAudioInput>(
+                audio, to_std(live_simulate_file_.get_file()) + " (simulated input)", true, settings);
+        } else {
+            ztrip::io::CaptureSettings capture;
+            capture.device = to_std(live_device_);
+            capture.loopback = live_loopback_;
+            live_ = std::make_unique<ztrip::io::LiveAudioInput>(capture, settings);
+        }
+    } catch (const std::exception& e) {
+        live_.reset();
+        live_error_ = to_godot(e.what());
+        UtilityFunctions::push_warning("ZtripPlayer: ", live_error_);
+    }
+    time_ = 0.0;
+    rebuild_evaluator();
+    set_status_changed();
+}
+
+void ZtripPlayer::stop_live() {
+    if (!live_) return;
+    live_.reset();
+    time_ = 0.0;
+    rebuild_evaluator();
+    set_status_changed();
+}
+
+// Live and file playback need different evaluators (live has no checkpoints
+// and resets on a jump back), so switching rebuilds it from the graph file.
+void ZtripPlayer::rebuild_evaluator() {
+    if (!evaluator_) return;
+    evaluator_.reset();
+    reload_graph();
+}
+
 // ---- Playback ------------------------------------------------------------------
 
 void ZtripPlayer::play(double from) {
+    if (live_input_) {
+        playing_ = true;
+        if (!live_) start_live();
+        return;
+    }
     if (from >= 0.0) time_ = from;
     playing_ = true;
     if (Node* ap = find_audio_player()) {
@@ -557,12 +712,17 @@ void ZtripPlayer::play(double from) {
 
 void ZtripPlayer::stop() {
     playing_ = false;
+    if (live_) {
+        stop_live();
+        return;
+    }
     if (Node* ap = find_audio_player()) {
         if (static_cast<bool>(ap->call("is_playing"))) ap->call("stop");
     }
 }
 
 void ZtripPlayer::seek(double t) {
+    if (live_) return; // live time is the input's clock
     time_ = std::max(0.0, std::isfinite(t) ? t : 0.0);
     if (Node* ap = find_audio_player()) {
         if (static_cast<bool>(ap->call("is_playing"))) ap->call("seek", time_);
@@ -623,6 +783,18 @@ void ZtripPlayer::poll(double delta) {
             reload_graph();
     }
 
+    if (live_) {
+        live_->update();
+        time_ = live_->time();
+        evaluate_and_apply();
+        return;
+    }
+    if (live_input_) {
+        // Live input that is stopped or failed to open: hold still.
+        if (!applied_) evaluate_and_apply();
+        return;
+    }
+
     // The song's audio clock leads whenever it is running; otherwise playback
     // runs on frame time.
     Node* ap = find_audio_player();
@@ -665,6 +837,7 @@ void ZtripPlayer::_notification(int what) {
         poll(get_process_delta_time());
         break;
     case NOTIFICATION_EXIT_TREE:
+        stop_live();
         binder_.restore();
         applied_ = false;
         break;

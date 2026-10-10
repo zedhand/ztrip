@@ -4,6 +4,8 @@ Thanks for trying the ztrip beta. This archive holds:
 
 - `bin/analyze-cli` (`analyze-cli.exe` on Windows): analyses a WAV file into
   band levels, envelopes, onsets and a beat grid. Run `analyze-cli --help`.
+- `bin/live-cli`: listens to a microphone or what the computer plays and
+  prints live band levels and onsets. `live-cli --list` lists inputs.
 - `include/` and `lib/`: the `ztrip_core` C++20 static library. From CMake,
   point `CMAKE_PREFIX_PATH` at this folder, then
   `find_package(ztrip CONFIG REQUIRED)` and link `ztrip::core`.

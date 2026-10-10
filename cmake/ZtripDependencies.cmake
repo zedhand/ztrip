@@ -33,3 +33,25 @@ FetchContent_Declare(nlohmann_json
   FIND_PACKAGE_ARGS 3.11
 )
 FetchContent_MakeAvailable(nlohmann_json)
+
+# miniaudio: live capture from microphones and loopback sources (Phase 5).
+# Only its device I/O is compiled; backends (WASAPI, PulseAudio, ALSA, ...)
+# are loaded at run time, so building needs no audio headers or libraries.
+FetchContent_Declare(miniaudio
+  GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+  GIT_TAG        0.11.22
+  GIT_SHALLOW    TRUE
+  SOURCE_SUBDIR  ztrip-no-cmake
+)
+FetchContent_MakeAvailable(miniaudio)
+
+add_library(ztrip_miniaudio STATIC ${miniaudio_SOURCE_DIR}/miniaudio.c)
+target_include_directories(ztrip_miniaudio PUBLIC $<BUILD_INTERFACE:${miniaudio_SOURCE_DIR}>)
+target_compile_definitions(ztrip_miniaudio PUBLIC
+  MA_NO_DECODING MA_NO_ENCODING MA_NO_GENERATION MA_NO_RESOURCE_MANAGER MA_NO_NODE_GRAPH MA_NO_ENGINE)
+find_package(Threads REQUIRED)
+target_link_libraries(ztrip_miniaudio PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+if(UNIX AND NOT APPLE)
+  target_link_libraries(ztrip_miniaudio PUBLIC m)
+endif()
+set_target_properties(ztrip_miniaudio PROPERTIES POSITION_INDEPENDENT_CODE ON EXPORT_NAME miniaudio)
