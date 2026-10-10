@@ -60,6 +60,7 @@ if(TARGET ztrip_godot)
     PATTERN "tests" EXCLUDE
     PATTERN ".gitignore" EXCLUDE
     PATTERN "*.wav" EXCLUDE
+    REGEX "music/.*\\.import$" EXCLUDE # Godot's import files for local songs
     PATTERN "*.lib" EXCLUDE
     PATTERN "*.exp" EXCLUDE)
   install(FILES hosts/godot/README.md DESTINATION godot COMPONENT godot)
