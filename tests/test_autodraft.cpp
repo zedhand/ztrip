@@ -39,12 +39,18 @@ TEST_CASE("auto_draft fills lanes from named event lists") {
     r.events.push_back({"onset.Sub", {{1.0, 1.0f}, {1.5, 0.2f}}});
     time::TempoMap tempo(120.0, 0.0);
     time::DraftSettings settings;
-    settings.lanes = {{"Kick", "onset.Sub", 0.5f}, {"Missing", "onset.Nope", 0.0f}};
+    settings.lanes = {{"Kick", "kick", 0.5f, "onset.Sub"}, {"Missing", "onset.Nope", 0.0f, ""}};
     const auto seq = time::auto_draft(r, tempo, settings);
     REQUIRE(seq.lanes.size() == 2);
     REQUIRE(seq.lanes[0].notes.size() == 1); // the weak hit is dropped
     CHECK(seq.lanes[0].notes[0].start_beat == Approx(2.0));
     CHECK(seq.lanes[1].notes.empty());
+
+    // A "kick" list, when present, wins over the fallback.
+    r.events.push_back({"kick", {{0.5, 1.0f}}});
+    const auto with_kick = time::auto_draft(r, tempo, settings);
+    REQUIRE(with_kick.lanes[0].notes.size() == 1);
+    CHECK(with_kick.lanes[0].notes[0].start_beat == Approx(1.0));
 }
 
 TEST_CASE("an auto-drafted kick lane lands on synthetic kicks") {

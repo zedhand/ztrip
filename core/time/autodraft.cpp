@@ -50,7 +50,9 @@ NoteSequence auto_draft(const analysis::AnalysisResult& analysis, const TempoMap
     seq.name = "auto-draft";
     for (const DraftLaneSpec& spec : settings.lanes) {
         std::vector<analysis::Trigger> events;
-        if (const auto* list = analysis.find_events(spec.events)) {
+        const auto* list = analysis.find_events(spec.events);
+        if (!list && !spec.fallback.empty()) list = analysis.find_events(spec.fallback);
+        if (list) {
             for (const auto& e : list->events) {
                 if (e.velocity >= spec.min_velocity) events.push_back(e);
             }

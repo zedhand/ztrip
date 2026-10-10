@@ -61,7 +61,7 @@ options:
   --bpm-prior BPM       centre of the tempo prior (default 120)
   --beats-per-bar N     beats per bar for downbeats (default 4)
   --grid G              auto-draft grid, 1/1..1/64, T for triplets (default 1/16)
-  --kick-events NAME    event list the Kick lane is drafted from (default onset.Sub)
+  --kick-events NAME    event list the Kick lane is drafted from (default kick, else onset.Sub)
   --nudge MS            shift the tempo map (and drafted notes) by MS milliseconds
   --clicks              also write <out>/kick_clicks.wav: the track with a click
                         on every drafted kick, for checking the draft by ear
@@ -168,7 +168,7 @@ std::optional<int> parse_args(int argc, char** argv, Options& opt) {
         } else if (arg == "--kick-events") {
             const auto v = value();
             if (!v) return 2;
-            opt.draft.lanes = {{"Kick", std::string(*v), 0.0f}};
+            opt.draft.lanes = {{"Kick", std::string(*v), 0.0f, ""}};
         } else if (arg == "--nudge") {
             if (!number(opt.nudge_ms)) return 2;
         } else if (arg == "--clicks") {
