@@ -72,6 +72,7 @@ LiveAnalyzer::LiveAnalyzer(int sample_rate, LiveSettings settings)
     full_events_ = result_.events.size();
     result_.events.push_back({"onset.full", {}});
     result_.events.push_back({"kick", {}});
+    result_.events.push_back({"snare", {}});
     result_.events.push_back({"beat", {}});
     result_.events.push_back({"downbeat", {}});
 
