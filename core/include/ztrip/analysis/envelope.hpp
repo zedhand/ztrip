@@ -4,7 +4,7 @@
 #include <span>
 #include <vector>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 
 struct EnvelopeSettings {
     float attack_ms = 5.0f;
@@ -32,4 +32,4 @@ std::vector<float> follow_envelope(std::span<const float> in, double rate_hz,
 std::vector<float> resample_linear(std::span<const float> values, double src_rate,
                                    double dst_rate, std::size_t dst_count);
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

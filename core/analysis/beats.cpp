@@ -1,13 +1,13 @@
-#include "mre/analysis/beats.hpp"
+#include "ztrip/analysis/beats.hpp"
 
-#include "mre/analysis/bands.hpp"
+#include "ztrip/analysis/bands.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <numeric>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 namespace {
 
 // Onset strength with its local mean removed and scaled to unit deviation.
@@ -280,4 +280,4 @@ BeatGrid analyze_beats(const Spectrogram& spec, std::span<const float> onset_str
     return grid;
 }
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

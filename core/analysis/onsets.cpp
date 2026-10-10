@@ -1,11 +1,11 @@
-#include "mre/analysis/onsets.hpp"
+#include "ztrip/analysis/onsets.hpp"
 
-#include "mre/analysis/bands.hpp"
+#include "ztrip/analysis/bands.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 namespace {
 
 float median_of(std::vector<float>& scratch) {
@@ -77,4 +77,4 @@ std::vector<Trigger> pick_onsets(std::span<const float> flux, double frame_rate,
     return out;
 }
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

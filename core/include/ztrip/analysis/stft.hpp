@@ -4,7 +4,7 @@
 #include <span>
 #include <vector>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 
 enum class Window { Hann, Hamming, BlackmanHarris };
 
@@ -44,4 +44,4 @@ std::vector<float> make_window(Window window, int n);
 // Throws std::invalid_argument for unsupported sizes or an empty signal.
 Spectrogram compute_stft(std::span<const float> mono, int sample_rate, const StftSettings& settings);
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

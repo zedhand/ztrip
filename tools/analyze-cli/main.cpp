@@ -4,10 +4,10 @@
 // (reused on the next run if audio and settings are unchanged), and writes
 // signals.csv, events.csv, beats.csv plus plot.py, which renders PNGs with
 // matplotlib.
-#include "mre/analysis/offline.hpp"
-#include "mre/io/wav.hpp"
-#include "mre/serialize/sigcache.hpp"
-#include "mre/version.hpp"
+#include "ztrip/analysis/offline.hpp"
+#include "ztrip/io/wav.hpp"
+#include "ztrip/serialize/sigcache.hpp"
+#include "ztrip/version.hpp"
 
 #include "plot_script.hpp"
 
@@ -24,7 +24,7 @@
 #include <string_view>
 
 namespace fs = std::filesystem;
-using namespace mre;
+using namespace ztrip;
 
 namespace {
 

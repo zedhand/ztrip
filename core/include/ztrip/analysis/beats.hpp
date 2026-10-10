@@ -1,11 +1,11 @@
 #pragma once
 
-#include "mre/analysis/stft.hpp"
+#include "ztrip/analysis/stft.hpp"
 
 #include <span>
 #include <vector>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 
 struct BeatSettings {
     float min_bpm = 50.0f;
@@ -46,4 +46,4 @@ int estimate_downbeat_phase(const Spectrogram& spec, std::span<const double> bea
 BeatGrid analyze_beats(const Spectrogram& spec, std::span<const float> onset_strength,
                        const BeatSettings& settings);
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

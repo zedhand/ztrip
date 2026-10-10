@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mre/analysis/offline.hpp"
+#include "ztrip/analysis/offline.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -8,7 +8,7 @@
 #include <span>
 #include <vector>
 
-namespace mre::serialize {
+namespace ztrip::serialize {
 
 // Identifies the analysis a cache holds; a cache is only reused when both match.
 struct SigcacheKey {
@@ -19,7 +19,7 @@ struct SigcacheKey {
 };
 
 // Binary .sigcache layout, all little-endian:
-//   "MRESIGC\0", u32 format version, u64 audio hash, u64 settings hash,
+//   "ZTRSIGC\0", u32 format version, u64 audio hash, u64 settings hash,
 //   f64 signal rate, f64 duration, f64 bpm, i32 beats per bar, i32 downbeat phase,
 //   u32 signal count, then per signal: u32 name length, name, u64 count, f32[count]
 //   u32 event list count, then per list: u32 name length, name, u64 count,
@@ -42,4 +42,4 @@ void write_sigcache(const std::filesystem::path& path, const SigcacheKey& key,
 std::optional<analysis::AnalysisResult> read_sigcache(const std::filesystem::path& path,
                                                       const SigcacheKey& expected);
 
-} // namespace mre::serialize
+} // namespace ztrip::serialize

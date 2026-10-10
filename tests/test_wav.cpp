@@ -1,4 +1,4 @@
-#include "mre/io/wav.hpp"
+#include "ztrip/io/wav.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -6,7 +6,7 @@
 #include <cstring>
 #include <stdexcept>
 
-using mre::io::parse_wav;
+using ztrip::io::parse_wav;
 
 namespace {
 
@@ -79,12 +79,12 @@ TEST_CASE("16-bit stereo PCM decodes and mixes to mono", "[wav]") {
     CHECK(audio.samples[0] == Catch::Approx(0.5f));
     CHECK(audio.samples[1] == Catch::Approx(-1.0f));
 
-    const auto mono = mre::io::to_mono(audio);
+    const auto mono = ztrip::io::to_mono(audio);
     CHECK(mono[0] == Catch::Approx(-0.25f));
     CHECK(mono[1] == Catch::Approx(0.25f));
-    const auto right = mre::io::to_mono(audio, 1);
+    const auto right = ztrip::io::to_mono(audio, 1);
     CHECK(right[0] == Catch::Approx(-1.0f));
-    CHECK_THROWS_AS(mre::io::to_mono(audio, 2), std::out_of_range);
+    CHECK_THROWS_AS(ztrip::io::to_mono(audio, 2), std::out_of_range);
 }
 
 TEST_CASE("24-bit and 32-bit PCM keep sign and scale", "[wav]") {

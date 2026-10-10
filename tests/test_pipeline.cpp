@@ -1,5 +1,5 @@
-#include "mre/analysis/offline.hpp"
-#include "mre/serialize/sigcache.hpp"
+#include "ztrip/analysis/offline.hpp"
+#include "ztrip/serialize/sigcache.hpp"
 
 #include "synth.hpp"
 
@@ -9,7 +9,7 @@
 #include <cstring>
 #include <filesystem>
 
-using namespace mre;
+using namespace ztrip;
 
 namespace {
 
@@ -103,7 +103,7 @@ TEST_CASE("sigcache round-trips and rejects stale or corrupt data", "[sigcache]"
     bad_magic[0] = 'X';
     CHECK_FALSE(serialize::decode_sigcache(bad_magic, key));
 
-    const auto path = std::filesystem::temp_directory_path() / "mre_test.sigcache";
+    const auto path = std::filesystem::temp_directory_path() / "ztrip_test.sigcache";
     serialize::write_sigcache(path, key, result);
     const auto from_file = serialize::read_sigcache(path, key);
     std::filesystem::remove(path);

@@ -1,4 +1,4 @@
-#include "mre/serialize/sigcache.hpp"
+#include "ztrip/serialize/sigcache.hpp"
 
 #include <bit>
 #include <cstring>
@@ -6,10 +6,10 @@
 #include <iterator>
 #include <stdexcept>
 
-namespace mre::serialize {
+namespace ztrip::serialize {
 namespace {
 
-constexpr char kMagic[8] = {'M', 'R', 'E', 'S', 'I', 'G', 'C', '\0'};
+constexpr char kMagic[8] = {'Z', 'T', 'R', 'S', 'I', 'G', 'C', '\0'};
 
 class Writer {
 public:
@@ -189,4 +189,4 @@ std::optional<analysis::AnalysisResult> read_sigcache(const std::filesystem::pat
     return decode_sigcache(bytes, expected);
 }
 
-} // namespace mre::serialize
+} // namespace ztrip::serialize

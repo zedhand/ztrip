@@ -1,4 +1,4 @@
-#include "mre/analysis/stft.hpp"
+#include "ztrip/analysis/stft.hpp"
 
 #include <pffft.h>
 
@@ -7,7 +7,7 @@
 #include <numbers>
 #include <stdexcept>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 namespace {
 
 struct AlignedFree {
@@ -105,4 +105,4 @@ Spectrogram compute_stft(std::span<const float> mono, int sample_rate,
     return spec;
 }
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

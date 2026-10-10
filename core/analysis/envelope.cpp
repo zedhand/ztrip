@@ -1,8 +1,8 @@
-#include "mre/analysis/envelope.hpp"
+#include "ztrip/analysis/envelope.hpp"
 
 #include <algorithm>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 
 std::vector<float> follow_envelope(std::span<const float> in, double rate_hz,
                                    const EnvelopeSettings& settings) {
@@ -46,4 +46,4 @@ std::vector<float> resample_linear(std::span<const float> values, double src_rat
     return out;
 }
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

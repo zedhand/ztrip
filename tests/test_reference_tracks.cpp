@@ -1,9 +1,9 @@
 // Accuracy on the project's reference tracks. The audio isn't in the repo
 // (tracks 2 and 3 are CC BY and need attribution if distributed), so these
-// tests skip unless MRE_REFERENCE_TRACKS points at a folder holding
+// tests skip unless ZTRIP_REFERENCE_TRACKS points at a folder holding
 // 01_four_on_the_floor_128bpm.wav and its .truth.json (and optionally 02/03).
-#include "mre/analysis/offline.hpp"
-#include "mre/io/wav.hpp"
+#include "ztrip/analysis/offline.hpp"
+#include "ztrip/io/wav.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -16,12 +16,12 @@
 #include <string>
 
 namespace fs = std::filesystem;
-using namespace mre;
+using namespace ztrip;
 
 namespace {
 
 fs::path reference_dir() {
-    const char* env = std::getenv("MRE_REFERENCE_TRACKS");
+    const char* env = std::getenv("ZTRIP_REFERENCE_TRACKS");
     return env ? fs::path(env) : fs::path();
 }
 
@@ -82,7 +82,7 @@ TEST_CASE("track 01: kicks, beats and downbeats match ground truth", "[reference
     const fs::path wav = dir / "01_four_on_the_floor_128bpm.wav";
     const fs::path truth = dir / "01_four_on_the_floor_128bpm.truth.json";
     if (dir.empty() || !fs::exists(wav) || !fs::exists(truth)) {
-        SKIP("set MRE_REFERENCE_TRACKS to the reference-tracks folder to run");
+        SKIP("set ZTRIP_REFERENCE_TRACKS to the reference-tracks folder to run");
     }
     const auto r = analysis::analyze(io::read_wav(wav), {});
 
@@ -112,7 +112,7 @@ TEST_CASE("track 01: kicks, beats and downbeats match ground truth", "[reference
 
 TEST_CASE("tracks 02 and 03 analyse to a steady, plausible grid", "[reference]") {
     const fs::path dir = reference_dir();
-    if (dir.empty()) SKIP("set MRE_REFERENCE_TRACKS to the reference-tracks folder to run");
+    if (dir.empty()) SKIP("set ZTRIP_REFERENCE_TRACKS to the reference-tracks folder to run");
     int ran = 0;
     for (const char* name : {"02_live_band_lets_go_fishin.wav", "03_syncopated_jazz_vibe_ace.wav"}) {
         const fs::path wav = dir / name;

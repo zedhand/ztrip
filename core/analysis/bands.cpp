@@ -1,9 +1,9 @@
-#include "mre/analysis/bands.hpp"
+#include "ztrip/analysis/bands.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 namespace {
 
 struct BinRange {
@@ -119,4 +119,4 @@ std::vector<float> spectral_centroid(const Spectrogram& spec) {
     return out;
 }
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

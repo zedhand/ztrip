@@ -3,7 +3,7 @@
 #include <span>
 #include <vector>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 
 // A timestamped event, e.g. an onset or a beat.
 struct Trigger {
@@ -28,4 +28,4 @@ struct OnsetSettings {
 std::vector<Trigger> pick_onsets(std::span<const float> flux, double frame_rate,
                                  const OnsetSettings& settings);
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

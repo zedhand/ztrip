@@ -1,5 +1,5 @@
-#include "mre/analysis/bands.hpp"
-#include "mre/analysis/stft.hpp"
+#include "ztrip/analysis/bands.hpp"
+#include "ztrip/analysis/stft.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -9,7 +9,7 @@
 #include <numbers>
 #include <stdexcept>
 
-using namespace mre::analysis;
+using namespace ztrip::analysis;
 
 namespace {
 
