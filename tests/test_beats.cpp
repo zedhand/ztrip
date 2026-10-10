@@ -48,3 +48,61 @@ TEST_CASE("tempo estimate is 0 for signals too short to judge", "[beats]") {
     CHECK(estimate_tempo(o, 100.0, {}) == 0.0);
     CHECK(track_beats(o, 100.0, 0.0, {}).empty());
 }
+
+TEST_CASE("drum_fit scores beats on the hits, not between them", "[beats]") {
+    std::vector<double> beats;
+    std::vector<Trigger> on, between;
+    for (int i = 0; i < 16; ++i) {
+        beats.push_back(0.5 * i);
+        on.push_back({0.5 * i + 0.01, 1.0f});
+        between.push_back({0.5 * i + 0.25, 1.0f});
+    }
+    CHECK(drum_fit(beats, on).f == Catch::Approx(1.0));
+    CHECK(drum_fit(beats, between).f == 0.0);
+    CHECK(drum_fit(beats, {}).f == 0.0);
+}
+
+TEST_CASE("a fast rock groove is read at the drummer's tempo, not half of it", "[beats]") {
+    // 200 BPM: kick on 1 and 3, snare on 2 and 4, hats on every beat. The
+    // onset autocorrelation and the 120 BPM prior favour 100 BPM (kick and
+    // snare as one pulse); the drum hits fit 200 better.
+    const int sr = 44100;
+    const double bpm = 200.0;
+    const double spb = 60.0 / bpm;
+    const int beats = 160;
+    std::vector<float> x(static_cast<std::size_t>((beats * spb + 1.0) * sr), 0.0f);
+    ztrip::test::Noise noise(7);
+    for (int b = 0; b < beats; ++b) {
+        const double t = 0.3 + b * spb;
+        if (b % 2 == 0) ztrip::test::add_kick(x, sr, t, 0.8f);
+        else ztrip::test::add_snare(x, sr, t, noise, 0.6f);
+        ztrip::test::add_hat(x, sr, t, noise);
+    }
+    const auto grid = analyze(x, sr, {}).beats;
+    INFO("-> " << grid.bpm << " BPM");
+    CHECK(grid.bpm == Catch::Approx(bpm).epsilon(0.01));
+}
+
+TEST_CASE("the tracker holds the beat through a run of louder off-beats", "[beats]") {
+    // A 100 BPM pulse at 100 frames/s where, for 6 beats in the middle,
+    // the on-beats go weak and louder hits land halfway between them, as when
+    // a live band pushes an off-beat accent. The grid must not slip half a
+    // beat onto them and back.
+    const double fr = 100.0;
+    const double period = 60.0;
+    std::vector<float> o(4800, 0.0f);
+    for (int k = 0; k * period < 4790.0; ++k) {
+        const auto f = static_cast<std::size_t>(10.0 + k * period);
+        const bool push = k >= 30 && k < 30 + 6;
+        o[f] = push ? 0.2f : 1.0f;
+        if (push) o[f + 30] = 2.0f;
+    }
+    // At the old default tightness (100) the grid slips here.
+    const auto beats = track_beats(o, fr, 100.0, {});
+    REQUIRE(beats.size() > 70);
+    int slips = 0;
+    for (std::size_t i = 1; i < beats.size(); ++i) {
+        if (std::fabs(beats[i] - beats[i - 1] - 0.6) > 0.03) ++slips;
+    }
+    CHECK(slips == 0);
+}
