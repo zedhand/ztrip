@@ -31,7 +31,7 @@ private:
 
 // Bumped whenever the pipeline changes in a way that alters its output, so
 // old caches are regenerated.
-constexpr std::uint32_t kPipelineVersion = 4;
+constexpr std::uint32_t kPipelineVersion = 5;
 
 } // namespace
 
@@ -204,6 +204,7 @@ std::uint64_t settings_hash(const AnalysisSettings& s) {
     h.add(s.beats.drum_weight);
     h.add(s.beats.min_drum_fit);
     h.add(s.beats.min_drum_precision);
+    h.add(s.beats.check_tightness);
     h.add(s.beats.drum_fit_margin);
     h.add(s.signal_rate_hz);
     return h.value();

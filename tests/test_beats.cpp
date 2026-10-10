@@ -82,3 +82,27 @@ TEST_CASE("a fast rock groove is read at the drummer's tempo, not half of it", "
     INFO("-> " << grid.bpm << " BPM");
     CHECK(grid.bpm == Catch::Approx(bpm).epsilon(0.01));
 }
+
+TEST_CASE("the tracker holds the beat through a run of louder off-beats", "[beats]") {
+    // A 100 BPM pulse at 100 frames/s where, for 6 beats in the middle,
+    // the on-beats go weak and louder hits land halfway between them, as when
+    // a live band pushes an off-beat accent. The grid must not slip half a
+    // beat onto them and back.
+    const double fr = 100.0;
+    const double period = 60.0;
+    std::vector<float> o(4800, 0.0f);
+    for (int k = 0; k * period < 4790.0; ++k) {
+        const auto f = static_cast<std::size_t>(10.0 + k * period);
+        const bool push = k >= 30 && k < 30 + 6;
+        o[f] = push ? 0.2f : 1.0f;
+        if (push) o[f + 30] = 2.0f;
+    }
+    // At the old default tightness (100) the grid slips here.
+    const auto beats = track_beats(o, fr, 100.0, {});
+    REQUIRE(beats.size() > 70);
+    int slips = 0;
+    for (std::size_t i = 1; i < beats.size(); ++i) {
+        if (std::fabs(beats[i] - beats[i - 1] - 0.6) > 0.03) ++slips;
+    }
+    CHECK(slips == 0);
+}
