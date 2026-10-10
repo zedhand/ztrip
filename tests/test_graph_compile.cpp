@@ -18,15 +18,15 @@ bool has_error(const graph::CompileResult& r, const std::string& fragment) {
 
 } // namespace
 
-TEST_CASE("the builtin registry has the 15 Phase 2 nodes", "[graph][compile]") {
+TEST_CASE("the builtin registry has the 15 Phase 2 nodes and NoteLane", "[graph][compile]") {
     const auto& reg = graph::NodeRegistry::builtin();
     for (const char* type : {"AudioBand", "AudioOnset", "BeatClock", "Constant", "Smooth", "Threshold", "RemapRange",
                              "ResponseCurve", "Clamp", "ADSR", "ImpulseDecay", "BeatLFO", "Add", "Multiply",
-                             "PropertyOut"}) {
+                             "PropertyOut", "NoteLane"}) {
         INFO(type);
         CHECK(reg.find(type) != nullptr);
     }
-    CHECK(reg.specs().size() == 15);
+    CHECK(reg.specs().size() == 16);
     // Continuous inputs double as number params for when they're unconnected.
     const auto* add = reg.find("Add");
     CHECK(add->param_index("a") >= 0);
