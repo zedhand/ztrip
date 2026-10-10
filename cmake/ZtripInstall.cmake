@@ -3,8 +3,7 @@
 #   sdk   ztrip_core static library, headers and a CMake package
 #         (find_package(ztrip) gives ztrip::core)
 #   docs  README, docs, examples, beta notes and third-party notices
-# The Godot addon (Phase 3) will add a "godot" component installing
-# addons/ztrip/ and append it to CPACK_COMPONENTS_ALL in ZtripPackaging.cmake.
+#   godot the Godot addon and demo project (only with ZTRIP_BUILD_GODOT)
 include(CMakePackageConfigHelpers)
 
 set(ZTRIP_CMAKE_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/ztrip")
@@ -52,3 +51,16 @@ install(FILES "${pffft_SOURCE_DIR}/LICENSE.txt"
   DESTINATION licenses RENAME pffft-LICENSE.txt COMPONENT docs)
 install(FILES "${nlohmann_json_SOURCE_DIR}/LICENSE.MIT"
   DESTINATION licenses RENAME nlohmann_json-LICENSE.txt COMPONENT docs)
+
+if(TARGET ztrip_godot)
+  # The demo project with the built addon inside, ready to open in Godot.
+  install(DIRECTORY hosts/godot/project/
+    DESTINATION godot COMPONENT godot
+    PATTERN ".godot" EXCLUDE
+    PATTERN "tests" EXCLUDE
+    PATTERN ".gitignore" EXCLUDE
+    PATTERN "*.wav" EXCLUDE
+    PATTERN "*.lib" EXCLUDE
+    PATTERN "*.exp" EXCLUDE)
+  install(FILES hosts/godot/README.md DESTINATION godot COMPONENT godot)
+endif()
