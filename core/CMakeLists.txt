@@ -15,6 +15,11 @@ add_library(ztrip_core STATIC
   graph/compiler.cpp
   graph/evaluator.cpp
   graph/nodes.cpp
+  time/tempo_map.cpp
+  time/note_sequence.cpp
+  time/autodraft.cpp
+  serialize/nseq.cpp
+  serialize/tempo.cpp
 )
 add_library(ztrip::core ALIAS ztrip_core)
 
