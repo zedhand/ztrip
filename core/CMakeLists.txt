@@ -7,6 +7,7 @@ add_library(ztrip_core STATIC
   analysis/envelope.cpp
   analysis/onsets.cpp
   analysis/kick.cpp
+  analysis/snare.cpp
   analysis/beats.cpp
   analysis/offline.cpp
   analysis/live.cpp
