@@ -23,6 +23,20 @@ inline float follow(float in, float& env, float attack, float release, float dt)
     return env;
 }
 
+// The follower with hold, one sample at a time at a fixed rate, from 0.
+class EnvelopeFollower {
+public:
+    EnvelopeFollower(double rate_hz, const EnvelopeSettings& settings);
+    float next(float in);
+    void reset() { env_ = 0.0f; hold_ = 0; }
+
+private:
+    float dt_, attack_, release_;
+    int hold_samples_;
+    float env_ = 0.0f;
+    int hold_ = 0;
+};
+
 // Runs the follower over a signal sampled at rate_hz, starting from 0.
 std::vector<float> follow_envelope(std::span<const float> in, double rate_hz,
                                    const EnvelopeSettings& settings);
