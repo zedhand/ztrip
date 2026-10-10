@@ -12,6 +12,8 @@ If something here does not match what you see, that is worth reporting too (see 
 | Motion Graph core | Works from C++ only | [Motion Graphs](#motion-graphs) |
 | Godot addon | Ready for testing | [Godot addon](#godot-addon) |
 | Timeline, tempo map and note lanes | Ready for testing | [Timeline](#timeline) |
+| Live audio (microphone, loopback) | Early, for trying out | [Live audio](#live-audio) |
+| MIDI, OSC and DMX control | Early, for trying out | [MIDI, OSC and DMX](#midi-osc-and-dmx) |
 
 Supported platforms for the beta are Windows 11 and Linux. macOS is not supported yet.
 
@@ -204,6 +206,25 @@ Select the `ZtripPlayer` and open **Timeline**. From the top down it shows bar n
 
 What to look for on a song with a clear beat: Kick notes sit on the kick drum (the Kick draft is tested to land within 20 ms of the real hits). Snare and Hats drafts are rougher, because they come from the Mid and Air bands, which guitars, vocals and cymbals also hit; expect to delete some.
 
+## Live audio
+
+ztrip can also react to sound as it happens: a microphone, or whatever the computer is playing (loopback).
+
+- **Check your input first:** `live-cli --list` lists inputs (loopback sources are marked). `live-cli` alone listens to the default microphone and prints the six band levels (0-9) ten times a second, plus a line of onsets when something hits; `live-cli --loopback` listens to what the computer plays. `live-cli --file song.wav` plays a WAV into it in real time if you have no microphone, and `--graph examples/kick_to_light.mgraph.json` prints the graph's outputs too.
+- **In Godot:** on the ZtripPlayer, turn on **Live input**, pick a device (empty means the default microphone) or tick **Live loopback**, then press **Playing**. The same graph that ran on a song now runs on the input.
+
+What to look for: clap or play music near the microphone and the Sub/Bass onsets should tick on kicks, with the light flashing on them. Live analysis adds about 15 ms; the sound card's buffer comes on top.
+
+## MIDI, OSC and DMX
+
+Faders, knobs and pads can drive a scene too, from a MIDI controller, an OSC app (TouchOSC, Open Stage Control) or a lighting desk over Art-Net or sACN.
+
+1. On the ZtripPlayer, under **Controls**, tick **Midi Input**, **Osc Input** or pick a **Dmx Input** protocol. The status line says what it is listening on.
+2. Press **Playing**. To make a fader drive one of the graph's macros, call `learn_macro("<macro name>")` from a script (or the remote debugger) and move the fader once. It is bound, and the binding saves with the scene.
+3. Or read controls in the graph itself with the **MidiNote**, **MidiCC**, **OscValue** and **DmxChannel** nodes.
+
+What to look for: the scene follows the fader within a frame. On Linux, MIDI needs ALSA (it is there on any desktop); Art-Net and OSC need the firewall to let UDP ports 6454 and 9000 in.
+
 ## Known limitations
 
 - Input must be WAV; convert other formats first.
@@ -213,7 +234,7 @@ What to look for on a song with a clear beat: Kick notes sit on the kick drum (t
 - The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick. The Timeline's Kick lane uses the dedicated kick detector instead.
 - Kicks more than 5 dB quieter than the loudest ones are skipped (soft ghost notes, or a quiet intro before a loud song). `--kick-gate 8` keeps more of them.
 - Drum and bass reads at half tempo (85 instead of 170 BPM). Use `--bpm-prior 170`.
-- No live input yet (microphone, MIDI, OSC, DMX). That comes after the beta.
+- Live audio has no beat grid or dedicated kick and snare detectors yet: `BeatClock` runs at a fixed `bpm`, and kicks come from Sub-band onsets. There is no learn button in the editor yet (use `learn_macro()` from a script), no MIDI clock or OSC output, and no gamepad or keyboard input.
 
 ## Reporting problems
 

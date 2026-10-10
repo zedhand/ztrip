@@ -1,6 +1,6 @@
 # Node reference
 
-The Phase 2 catalog (the 15 essential nodes) plus Phase 4's `NoteLane`. Each Continuous input also has a
+The Phase 2 catalog (the 15 essential nodes), Phase 4's `NoteLane` and Phase 5's live control sources. Each Continuous input also has a
 number param of the same name, used when the input is unconnected (and
 promotable to a macro). Defaults are in brackets.
 
@@ -19,6 +19,10 @@ A tick `n` is at `t = n / 120` s and reports events in `((n-1)/120, n/120]`.
 | `AudioOnset` | | `trigger` T | `source` ["main"], `band` ["full"] reads `onset.<band>`, `min_velocity` [0] |
 | `BeatClock` | | `clock` K, `beat` T, `bar` T, `beat_phase` C, `bar_phase` C | `source` ["main"]; with no beat grid bound: `bpm` [120], `beats_per_bar` [4] |
 | `NoteLane` | | `gate` C, `trigger` T, `envelope` C, `velocity` C | `source` ["main"] tempo slot, `sequence` ["main"] Note Sequence slot, `lane` ["Kick"] |
+| `MidiNote` | | `gate` C, `trigger` T, `velocity` C | `source` ["main"] controls slot, `channel` [0] (1-16, 0 = any), `note` [36] |
+| `MidiCC` | | `out` C | `source` ["main"], `channel` [0], `cc` [1]; value/127 |
+| `OscValue` | | `out` C, `trigger` T | `source` ["main"], `address` ["/fader/1"]; `out` is the first argument as sent, `trigger` fires per message |
+| `DmxChannel` | | `out` C | `source` ["main"], `universe` [0], `channel` [1] (1-512), `fine` [false] reads `channel` and `channel + 1` as one 16-bit value |
 | `Constant` | | `out` C | `value` [0] |
 
 `source` is a slot name. `Evaluator::bind_source("main", &analysis)` points
@@ -28,6 +32,12 @@ stem) only rebinds the slot. Unbound sources output 0.
 A bound tempo map (`Evaluator::bind_tempo("main", &tempo)`) takes priority
 over the analysed beat grid for `BeatClock` and `NoteLane`: beats and bars then
 follow the map, including its offset, nudge and meter changes.
+
+The live control sources read the `io::ControlSet` bound with
+`Evaluator::bind_controls` (MIDI, OSC, DMX inputs record into it; see
+ARCHITECTURE.md). Controls are histories, so these nodes are functions of
+time like the rest, and a control that never moved reads 0. Art-Net
+universes count from 0 and sACN universes from 1, as each protocol does.
 
 `NoteLane` reads one lane of the Note Sequence bound with
 `Evaluator::bind_sequence`. `gate` is 1 while any note is held, `trigger` fires

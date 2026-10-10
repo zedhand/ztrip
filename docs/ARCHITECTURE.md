@@ -143,7 +143,20 @@ Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of
 4. **Result:** an `AnalysisResult` with the offline names, growing as audio arrives, so a graph moves from a file to live input by binding the live result to the slot and setting `EvaluatorSettings::live`. Values and events are stamped on the stream's sample clock when they become known, and `time()` is the latest analysed frame, so a host evaluates at `time()` and never misses an event. `kick`, `snare`, `beat` and `downbeat` exist but are empty for now (BeatClock falls back to its `bpm` param).
 5. **Threads:** the analyser is not thread safe. A capture thread hands samples over through `io::SpscRing` (lock free, drops and counts what doesn't fit), and the evaluating thread drains it into `push`, with `push_silence` for dropped samples so the clock stays on the device's.
 
+6. **Capture:** `io::AudioCapture` opens a microphone or loopback source with miniaudio (backends are loaded at run time, so builds need no audio SDK) and writes the mono mix (or one channel) into an SPSC ring from the device thread. `io::LiveAudioInput` pairs a capture (or a WAV played in real time, for trying setups without a device) with a `LiveAnalyzer`; `update()` drains the ring. `live-cli` prints live levels and onsets, and the Godot player's `live_input` binds a live input to `main`.
+
 On reference track 01, live `onset.Sub` (velocity 0.3 or more) finds 99% of the kicks with 100% precision, 12 ms late on average and 15 ms at worst; `onset.Air` finds every hat within 18 ms.
+
+## Live controls (Phase 5)
+
+MIDI, OSC and DMX share one model: named controls with a value history and triggers (`io::ControlSet`).
+
+- **Names:** `midi/<channel>/note/<n>`, `midi/<channel>/cc/<n>`, `midi/<channel>/pitchbend` (each MIDI message is also recorded under channel 0, "any"), `osc<address>` (first argument; further ones as `osc<address>/<k>`), `dmx/<universe>/<channel>`.
+- **Inputs:** `io::MidiInput` (RtMidi: ALSA on Linux, Windows MM), `io::OscInput` (UDP, messages and bundles), `io::DmxInput` (Art-Net ArtDmx or sACN E1.31 over UDP, own parsers; only changed channels are passed on). Each receives on its own thread into an SPSC ring of fixed-size `ControlMessage`s; `update(controls, stamp)` records them on the evaluating thread.
+- **Timing:** input is stamped with `Evaluator::stamp_time(t)`, the tick the next evaluate reaches (or the next unevaluated tick), so it shows on the next frame and no trigger lands on a tick already passed. In a 60 fps loop, an Art-Net packet reaches a graph output about 18 ms after it is sent (test: "a fader over Art-Net and an OSC message reach the graph within 30 ms").
+- **History:** a control keeps every change, so evaluation is still a function of time and a seek plays back what controls did; new input after a seek back replaces that control's later history.
+- **Macros:** a `ControlBinding` maps a control onto a macro's range; `ControlLearn` binds the next control that moves. Bindings save as `*.controls.json` controller profiles (`serialize::load_controls` / `save_controls`).
+- **Nodes:** `MidiNote`, `MidiCC`, `OscValue`, `DmxChannel` (see [NODES.md](NODES.md)).
 
 ## Persisted formats
 

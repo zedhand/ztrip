@@ -87,6 +87,13 @@ const time::NoteSequence* SourceSet::find_sequence(std::string_view slot) const 
     return find_slot(sequences_, slot);
 }
 
+void SourceSet::bind_controls(std::string slot, const io::ControlSet* controls) {
+    bind_slot(controls_, std::move(slot), controls);
+}
+const io::ControlSet* SourceSet::find_controls(std::string_view slot) const noexcept {
+    return find_slot(controls_, slot);
+}
+
 double NodeSetup::number(std::string_view param) const { return param_or_default<double>(*this, param); }
 bool NodeSetup::boolean(std::string_view param) const { return param_or_default<bool>(*this, param); }
 const std::string& NodeSetup::string(std::string_view param) const {

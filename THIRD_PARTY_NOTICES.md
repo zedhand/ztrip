@@ -9,8 +9,8 @@ committed to this repository. Release archives carry this file.
 | [pffft](https://github.com/marton78/pffft) | v1.1.0 | BSD-style (FFTPACK) | FFT in the analysis STFT | Yes (core library, cli, Godot addon) |
 | [nlohmann/json](https://github.com/nlohmann/json) | v3.11.3 | MIT | `.mgraph.json`, `.nseq.json`, `.tempo.json` files | Yes |
 | [godot-cpp](https://github.com/godotengine/godot-cpp) | godot-4.5-stable | MIT | Godot GDExtension bindings | Yes (Godot addon) |
-| [miniaudio](https://github.com/mackron/miniaudio) | 0.11.22 | Public domain (Unlicense) or MIT-0 | Live audio capture | Yes, once live capture ships |
-| [RtMidi](https://github.com/thestk/rtmidi) | 6.0.0 | MIT-style | Live MIDI input | Yes, once live controls ship |
+| [miniaudio](https://github.com/mackron/miniaudio) | 0.11.22 | Public domain (Unlicense) or MIT-0 | Live audio capture | Yes (core library, live-cli, Godot addon) |
+| [RtMidi](https://github.com/thestk/rtmidi) | 6.0.0 | MIT-style | Live MIDI input | Yes (core library, live-cli, Godot addon) |
 | [Catch2](https://github.com/catchorg/Catch2) | v3.7.1 | BSL-1.0 | Unit tests | No (tests only) |
 
 The Godot engine itself is not bundled; the addon runs inside your own copy of
