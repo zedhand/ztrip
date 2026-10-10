@@ -78,7 +78,11 @@ jobs:
         run: |
           version="$(tr -d '\r\n' < build/release/ztrip-version.txt)"
           name="ztrip-${version}-${{ matrix.platform }}"
-          archive="$(ls build/release/packages/${name}.zip build/release/packages/${name}.tar.gz 2>/dev/null)"
+          archive=""
+          for f in "build/release/packages/${name}.zip" "build/release/packages/${name}.tar.gz"; do
+            if [ -f "$f" ]; then archive="$f"; fi
+          done
+          if [ -z "${archive}" ]; then echo "::error::No archive named ${name}"; exit 1; fi
           mkdir -p build/extract
           (cd build/extract && cmake -E tar xf "../../${archive}")
           root="$PWD/build/extract/${name}"
