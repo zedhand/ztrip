@@ -1,5 +1,12 @@
 @PACKAGE_INIT@
 
+# Live capture (miniaudio) runs on its own thread, and MIDI uses ALSA on Linux.
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+if(@ALSA_FOUND@)
+  find_dependency(ALSA)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/ztripTargets.cmake")
 set(ztrip_VERSION_FULL "@ZTRIP_VERSION_FULL@")
 check_required_components(ztrip)

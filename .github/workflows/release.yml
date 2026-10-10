@@ -55,7 +55,7 @@ jobs:
         if: runner.os == 'Windows'
       - name: Install toolchain
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build g++-12
+        run: sudo apt-get update && sudo apt-get install -y ninja-build g++-12 libasound2-dev
       # The addon gets its own build tree: ZTRIP_BUILD_GODOT puts MSVC on the
       # static runtime, which the SDK library in the archive must not use.
       # Only its godot component goes into the archive.

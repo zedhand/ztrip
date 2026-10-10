@@ -69,6 +69,18 @@ void Evaluator::bind_sequence(std::string slot, const time::NoteSequence* sequen
     clear_checkpoints();
 }
 
+void Evaluator::bind_controls(std::string slot, const io::ControlSet* controls) {
+    sources_.bind_controls(std::move(slot), controls);
+    for (auto& n : graph_->nodes) n.impl->bind(sources_);
+    clear_checkpoints();
+}
+
+double Evaluator::stamp_time(double t) const noexcept {
+    const double pos = std::floor(t * settings_.rate_hz + 1e-6);
+    const std::int64_t n = std::isfinite(pos) ? std::max<std::int64_t>(0, static_cast<std::int64_t>(pos)) : 0;
+    return static_cast<double>(std::max(n, step_ + 1)) / settings_.rate_hz;
+}
+
 bool Evaluator::set_macro(std::string_view name, double value) {
     for (const CompiledMacro& m : graph_->macros) {
         if (m.name != name) continue;

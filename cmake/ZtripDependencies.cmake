@@ -33,3 +33,53 @@ FetchContent_Declare(nlohmann_json
   FIND_PACKAGE_ARGS 3.11
 )
 FetchContent_MakeAvailable(nlohmann_json)
+
+# miniaudio: live capture from microphones and loopback sources (Phase 5).
+# Only its device I/O is compiled; backends (WASAPI, PulseAudio, ALSA, ...)
+# are loaded at run time, so building needs no audio headers or libraries.
+FetchContent_Declare(miniaudio
+  GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+  GIT_TAG        0.11.22
+  GIT_SHALLOW    TRUE
+  SOURCE_SUBDIR  ztrip-no-cmake
+)
+FetchContent_MakeAvailable(miniaudio)
+
+add_library(ztrip_miniaudio STATIC ${miniaudio_SOURCE_DIR}/miniaudio.c)
+target_include_directories(ztrip_miniaudio PUBLIC $<BUILD_INTERFACE:${miniaudio_SOURCE_DIR}>)
+target_compile_definitions(ztrip_miniaudio PUBLIC
+  MA_NO_DECODING MA_NO_ENCODING MA_NO_GENERATION MA_NO_RESOURCE_MANAGER MA_NO_NODE_GRAPH MA_NO_ENGINE)
+find_package(Threads REQUIRED)
+target_link_libraries(ztrip_miniaudio PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+if(UNIX AND NOT APPLE)
+  target_link_libraries(ztrip_miniaudio PUBLIC m)
+endif()
+set_target_properties(ztrip_miniaudio PROPERTIES POSITION_INDEPENDENT_CODE ON EXPORT_NAME miniaudio)
+
+# RtMidi: MIDI input (Phase 5), with ALSA on Linux and Windows MM on Windows.
+# Without the ALSA headers (libasound2-dev) it builds with no MIDI backend,
+# and MIDI input reports that no ports exist.
+FetchContent_Declare(rtmidi
+  GIT_REPOSITORY https://github.com/thestk/rtmidi.git
+  GIT_TAG        6.0.0
+  GIT_SHALLOW    TRUE
+  SOURCE_SUBDIR  ztrip-no-cmake
+)
+FetchContent_MakeAvailable(rtmidi)
+
+add_library(ztrip_rtmidi STATIC ${rtmidi_SOURCE_DIR}/RtMidi.cpp)
+target_include_directories(ztrip_rtmidi PUBLIC $<BUILD_INTERFACE:${rtmidi_SOURCE_DIR}>)
+if(WIN32)
+  target_compile_definitions(ztrip_rtmidi PRIVATE __WINDOWS_MM__)
+  target_link_libraries(ztrip_rtmidi PUBLIC winmm)
+else()
+  find_package(ALSA)
+  if(ALSA_FOUND)
+    target_compile_definitions(ztrip_rtmidi PRIVATE __LINUX_ALSA__)
+    target_link_libraries(ztrip_rtmidi PUBLIC ALSA::ALSA Threads::Threads)
+  else()
+    message(WARNING "ALSA headers not found (install libasound2-dev): building without MIDI input")
+    target_compile_definitions(ztrip_rtmidi PRIVATE __RTMIDI_DUMMY__)
+  endif()
+endif()
+set_target_properties(ztrip_rtmidi PROPERTIES POSITION_INDEPENDENT_CODE ON EXPORT_NAME rtmidi)

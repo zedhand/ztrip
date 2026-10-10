@@ -1,0 +1,7 @@
+add_executable(ztrip_live main.cpp)
+if(WIN32)
+  target_sources(ztrip_live PRIVATE utf8.manifest)
+endif()
+set_target_properties(ztrip_live PROPERTIES OUTPUT_NAME live-cli)
+target_link_libraries(ztrip_live PRIVATE ztrip::core)
+ztrip_set_warnings(ztrip_live)
