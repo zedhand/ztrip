@@ -2,7 +2,7 @@
 
 Music-reactive animation engine (`ztrip`): an engine-agnostic C++20 core that turns audio and live inputs into animation, with Godot 4 and Unreal Engine 5.6+ hosts planned.
 
-Status: Phase 1 (offline audio analysis) and Phase 2 (Motion Graph core: compiler, evaluator, 15 nodes, `.mgraph.json`) are in. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/NODES.md](docs/NODES.md).
+Status: Phase 1 (offline audio analysis) and Phase 2 (Motion Graph core: compiler, evaluator, 15 nodes, `.mgraph.json`) are in. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/NODES.md](docs/NODES.md). Beta archives for Windows and Linux are described in [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Build
 
