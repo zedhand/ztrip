@@ -110,18 +110,25 @@ TEST_CASE("track 01: kicks, beats and downbeats match ground truth", "[reference
     CHECK(down.precision >= 0.9);
 }
 
-TEST_CASE("tracks 02 and 03 analyse to a steady, plausible grid", "[reference]") {
+TEST_CASE("tracks 02 and 03 find the tempo a listener claps to", "[reference]") {
     const fs::path dir = reference_dir();
     if (dir.empty()) SKIP("set ZTRIP_REFERENCE_TRACKS to the reference-tracks folder to run");
+    // No ground truth for these. The tempos are where ztrip and librosa's
+    // beat tracker agree, and track 02's 89 BPM was confirmed by clapping
+    // along to a click track (librosa and the old ztrip read 89 and 118).
+    struct Expect {
+        const char* name;
+        double bpm;
+    };
     int ran = 0;
-    for (const char* name : {"02_live_band_lets_go_fishin.wav", "03_syncopated_jazz_vibe_ace.wav"}) {
-        const fs::path wav = dir / name;
+    for (const Expect e : {Expect{"02_live_band_lets_go_fishin.wav", 89.0},
+                           Expect{"03_syncopated_jazz_vibe_ace.wav", 129.5}}) {
+        const fs::path wav = dir / e.name;
         if (!fs::exists(wav)) continue;
         ++ran;
         const auto r = analysis::analyze(io::read_wav(wav), {});
-        INFO(name << ": " << r.beats.bpm << " BPM, " << r.beats.beats.size() << " beats");
-        CHECK(r.beats.bpm > 70.0);
-        CHECK(r.beats.bpm < 180.0);
+        INFO(e.name << ": " << r.beats.bpm << " BPM, " << r.beats.beats.size() << " beats");
+        CHECK(r.beats.bpm == Catch::Approx(e.bpm).epsilon(0.03));
         // Beats should cover most of the track at the reported tempo.
         CHECK(static_cast<double>(r.beats.beats.size()) > 0.8 * r.duration_s * r.beats.bpm / 60.0);
     }
