@@ -62,19 +62,31 @@ double estimate_tempo(std::span<const float> onset_strength, double frame_rate,
     const std::vector<float> o = condition(onset_strength, frame_rate);
     const auto min_lag = static_cast<std::size_t>(std::floor(60.0 * frame_rate / settings.max_bpm));
     const auto max_lag = static_cast<std::size_t>(std::ceil(60.0 * frame_rate / settings.min_bpm));
-    if (min_lag < 1 || o.size() < 2 * max_lag + 2) return 0.0;
+    // Half lags (twice the tempo) are needed for the subdivision term below.
+    const std::size_t first_lag = min_lag / 2;
+    if (first_lag < 2 || o.size() < 2 * max_lag + 2) return 0.0;
 
     std::vector<double> ac(max_lag + 2, 0.0);
-    for (std::size_t lag = min_lag - 1; lag <= max_lag + 1; ++lag) {
+    for (std::size_t lag = first_lag - 1; lag <= max_lag + 1; ++lag) {
         double sum = 0.0;
         for (std::size_t t = 0; t + lag < o.size(); ++t) sum += static_cast<double>(o[t]) * o[t + lag];
         ac[lag] = sum / static_cast<double>(o.size() - lag);
     }
+    auto ac_at = [&](double lag) {
+        const auto i = static_cast<std::size_t>(lag);
+        const double frac = lag - static_cast<double>(i);
+        return ac[i] * (1.0 - frac) + ac[i + 1] * frac;
+    };
 
+    // A beat is usually subdivided in two, so a tempo also earns the
+    // autocorrelation at twice its rate. This separates the beat from
+    // related pulses at 3:4 or 3:2 of it, which plain autocorrelation
+    // confuses on swung and live material.
     std::size_t best = 0;
     double best_score = 0.0;
     for (std::size_t lag = min_lag; lag <= max_lag; ++lag) {
-        const double score = ac[lag] * prior_weight(60.0 * frame_rate / static_cast<double>(lag), settings);
+        const double support = ac[lag] + ac_at(0.5 * static_cast<double>(lag));
+        const double score = support * prior_weight(60.0 * frame_rate / static_cast<double>(lag), settings);
         if (score > best_score) {
             best_score = score;
             best = lag;
