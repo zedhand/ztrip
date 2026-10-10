@@ -26,6 +26,22 @@ std::uint32_t read_u32(const std::uint8_t* p) {
     throw std::runtime_error("wav: " + what);
 }
 
+// Names the format of a file that is not WAV, from its first bytes, so the
+// error can say what the user actually passed in.
+const char* guess_format(std::span<const std::uint8_t> b) {
+    auto starts = [&](const char* magic, std::size_t at = 0) {
+        const std::size_t n = std::strlen(magic);
+        return b.size() >= at + n && std::memcmp(b.data() + at, magic, n) == 0;
+    };
+    if (starts("ID3") || (b.size() >= 2 && b[0] == 0xFF && (b[1] & 0xE0) == 0xE0)) return "an MP3";
+    if (starts("fLaC")) return "a FLAC";
+    if (starts("OggS")) return "an Ogg";
+    if (starts("FORM")) return "an AIFF";
+    if (starts("ftyp", 4)) return "an M4A/AAC";
+    if (starts("RF64")) return "an RF64 (WAV over 4 GB)";
+    return nullptr;
+}
+
 float decode_sample(const std::uint8_t* p, std::uint16_t format, int bits) {
     if (format == kFormatFloat) {
         if (bits == 32) {
@@ -61,7 +77,11 @@ float decode_sample(const std::uint8_t* p, std::uint16_t format, int bits) {
 AudioBuffer parse_wav(std::span<const std::uint8_t> bytes) {
     if (bytes.size() < 12 || std::memcmp(bytes.data(), "RIFF", 4) != 0 ||
         std::memcmp(bytes.data() + 8, "WAVE", 4) != 0) {
-        fail("not a RIFF/WAVE file");
+        const char* kind = guess_format(bytes);
+        const std::string what =
+            kind ? "this is " + std::string(kind) + " file, not WAV" : "not a RIFF/WAVE file";
+        fail(what + ". Only WAV is supported; convert it first, for example: "
+                    "ffmpeg -i song.mp3 song.wav");
     }
 
     std::uint16_t format = 0;
