@@ -14,7 +14,7 @@ Under the hood it is an engine-agnostic C++20 core with a Godot 4 addon and an U
 | Motion Graph core: compiler, evaluator, 15 nodes, `.mgraph.json` | Done |
 | Godot 4 addon: song playback, property binder, Motion Graph panel, demo stage | Done (beta) |
 | Musical time core: tempo map, Note Sequences, auto-drafted kick lane, `NoteLane` node | Done |
-| Musical time: timeline dock in Godot | Planned for beta |
+| Musical time: Timeline panel in Godot (tempo map, note lanes, draw, nudge, save) | Done (beta) |
 | Live input: mic, MIDI, OSC, DMX | After beta |
 | Unreal Engine plugin | After beta |
 
@@ -39,7 +39,7 @@ cmake --preset godot
 cmake --build --preset godot
 ```
 
-Then open `hosts/godot/project` in Godot 4.5 or newer, drop a WAV onto the demo stage's `Music` node and scrub the `ZtripPlayer`'s **Time**: lights, the orb's material and the camera follow the song in the editor. [hosts/godot/README.md](hosts/godot/README.md) covers the addon, target paths and the graph panel.
+Then open `hosts/godot/project` in Godot 4.5 or newer, drop a WAV onto the demo stage's `Music` node and scrub the `ZtripPlayer`'s **Time**: lights, the orb's material and the camera follow the song in the editor. The **Timeline** panel at the bottom shows the drafted tempo map and Kick, Snare and Hats lanes that fire the lights; edit a note and the light follows. [hosts/godot/README.md](hosts/godot/README.md) covers the addon, target paths and the graph panel.
 
 ## Analyse a track
 

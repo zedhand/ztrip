@@ -3,7 +3,9 @@
 # Godot's Movie Maker mode (fixed frame rate, so the video is in sync even
 # when rendering is slower than real time).
 #
-#   hosts/godot/render_video.sh <song.wav> <out.mp4> [start_s] [length_s] [caption]
+#   hosts/godot/render_video.sh <song.wav> <out.mp4> [start_s] [length_s] [caption] [timeline]
+#
+# Pass 1 as `timeline` to show the Timeline panel along the bottom.
 #
 # Needs: the extension built (cmake --preset godot && cmake --build --preset godot),
 # Godot 4.5+ as $GODOT (default: godot on PATH) and ffmpeg. With no display,
@@ -15,6 +17,7 @@ out=$(realpath -m "$2")
 start=${3:-0}
 length=${4:-30}
 caption=${5:-}
+timeline=${6:-0}
 godot=${GODOT:-godot}
 project="$(cd "$(dirname "$0")/project" && pwd)"
 tmp=$(mktemp -d)
@@ -33,7 +36,7 @@ ffmpeg -loglevel error -y -i "$song" -c:a pcm_s16le "$tmp/song.wav"
 
 "${wrap[@]}" "$godot" --path "$project" --rendering-driver opengl3 --resolution 1280x720 \
   --write-movie "$tmp/frames.avi" --fixed-fps 30 res://demo/stage.tscn \
-  -- --song="$tmp/song.wav" --start="$start" --length="$length" --caption="$caption"
+  -- --song="$tmp/song.wav" --start="$start" --length="$length" --caption="$caption" --timeline="$timeline"
 
 ffmpeg -loglevel error -y -i "$tmp/frames.avi" -c:v libx264 -pix_fmt yuv420p -crf 20 \
   -c:a aac -b:a 160k -movflags +faststart "$out"

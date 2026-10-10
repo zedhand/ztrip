@@ -2,6 +2,7 @@
 #include "ztrip_analysis.h"
 #include "ztrip_graph_tools.h"
 #include "ztrip_player.h"
+#include "ztrip_timeline.h"
 
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -16,6 +17,7 @@ void initialize_ztrip(ModuleInitializationLevel level) {
     if (level != MODULE_INITIALIZATION_LEVEL_SCENE) return;
     GDREGISTER_CLASS(ZtripAnalysis);
     GDREGISTER_CLASS(ZtripGraphTools);
+    GDREGISTER_CLASS(ZtripTimeline);
     GDREGISTER_CLASS(ZtripPlayer);
 }
 

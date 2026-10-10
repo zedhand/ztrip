@@ -4,13 +4,17 @@ extends SceneTree
 ##   godot --headless --path hosts/godot/project -s res://tests/test_host.gd
 ## Synthesises a 120 BPM kick track, plays it through a graph into a light, a
 ## shader uniform and a camera, and checks the values, seeking, macros,
-## hot reload and write-back. Exits with the number of failed checks.
+## hot reload and write-back, then drafts and edits the song's timeline
+## through the Timeline panel. Exits with the number of failed checks.
 
 const RATE := 48000
 const BPM := 120.0
 const SECONDS := 10.0
 const WAV := "user://ztrip_test_kicks.wav"
 const GRAPH := "user://ztrip_test.mgraph.json"
+const LANE_GRAPH := "user://ztrip_test_lanes.mgraph.json"
+const TEMPO := "user://ztrip_test.tempo.json"
+const SEQUENCE := "user://ztrip_test.nseq.json"
 
 var _failures := 0
 var _checks := 0
@@ -163,11 +167,16 @@ func _run() -> void:
 	scene.free()
 
 	await _test_graph_panel()
+	await _test_timeline()
 
 
 # The editor's Motion Graph panel: load, edit, check and save a graph.
 func _test_graph_panel() -> void:
-	var panel: Control = load("res://addons/ztrip/editor/graph_panel.gd").new()
+	var script: GDScript = load("res://addons/ztrip/editor/graph_panel.gd")
+	_check(script != null and script.can_instantiate(), "the Motion Graph panel script loads")
+	if script == null or not script.can_instantiate():
+		return
+	var panel: Control = script.new()
 	root.add_child(panel)
 	await process_frame
 	panel.open_file("res://demo/stage.mgraph.json")
@@ -189,6 +198,167 @@ func _test_graph_panel() -> void:
 	_check(saved == ZtripGraphTools.normalize_graph(saved).text, "saved files are in the canonical format")
 	panel.queue_free()
 	await process_frame
+
+
+# The song's timeline: drafted on load, played by NoteLane, edited in the
+# Timeline panel, saved and loaded back.
+func _test_timeline() -> void:
+	_check(is_equal_approx(ZtripTimeline.grid_step("1/8T"), 1.0 / 3.0) and ZtripTimeline.grid_step("1/7") == 0.0,
+			"grid steps parse, triplets included")
+	for f in [TEMPO, SEQUENCE]:
+		if FileAccess.file_exists(f):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(f))
+	_write_lane_graph(LANE_GRAPH)
+
+	var scene := Node3D.new()
+	var light := OmniLight3D.new()
+	light.name = "Key"
+	light.light_energy = 0.0
+	scene.add_child(light)
+	var player: Node = ClassDB.instantiate("ZtripPlayer")
+	player.threaded_loading = false
+	player.audio_file = WAV
+	player.graph_file = LANE_GRAPH
+	player.tempo_file = TEMPO
+	player.sequence_file = SEQUENCE
+	scene.add_child(player)
+	root.add_child(scene)
+	await process_frame
+	player.wait_until_loaded()
+
+	var tl = player.get_timeline()
+	_check(tl.get_lane_names() == PackedStringArray(["Kick", "Snare", "Hats"]), "lanes are drafted: %s" % str(tl.get_lane_names()))
+	_check(absf(tl.bpm_at(4.0) - BPM) < 1.0, "the tempo map is drafted at 120 BPM (%.2f)" % tl.bpm_at(4.0))
+	var notes: Array = tl.get_notes("Kick")
+	var worst := 0.0
+	for n in notes:
+		var s: float = tl.note_seconds("Kick", n.start_beat)
+		worst = maxf(worst, absf(s - roundf(s / 0.5) * 0.5))
+	_check(notes.size() >= 18 and notes.size() <= 21, "about 20 kick notes drafted (got %d)" % notes.size())
+	_check(worst < 0.020, "every drafted kick lands within 20 ms of the true kick (worst %.1f ms)" % (worst * 1000.0))
+	_check("drafted" in player.get_status(), "the status says the timeline is drafted")
+
+	var kick_t: float = tl.note_seconds("Kick", notes[6].start_beat)
+	player.seek(kick_t + 0.02)
+	_check(light.light_energy > 2.0, "a Kick note flashes the light (%.2f)" % light.light_energy)
+	tl.remove_note("Kick", 6)
+	player.update_now()
+	_check(light.light_energy < 0.5, "removing the note darkens it at once (%.2f)" % light.light_energy)
+
+	# The panel, driven by synthetic mouse and key events.
+	var script: GDScript = load("res://addons/ztrip/editor/timeline_panel.gd")
+	_check(script != null and script.can_instantiate(), "the Timeline panel script loads")
+	if script == null or not script.can_instantiate():
+		return
+	var panel: Control = script.new()
+	panel.size = Vector2(1400, 320)
+	root.add_child(panel)
+	panel.attach_player(player)
+	await process_frame
+	panel.set_view(0.0, 120.0)
+	_check(panel._lanes.size() == 3 and panel._notes["Kick"].size() == notes.size() - 1, "the panel shows the lanes and notes")
+
+	var count: int = tl.get_note_count("Kick")
+	var at: Vector2 = panel.lane_point("Kick", 6.5)
+	_click(panel, at, true)
+	_click(panel, at, false)
+	_check(tl.get_note_count("Kick") == count + 1, "clicking an empty spot adds a note")
+	var at_click: Array = tl.get_notes("Kick").filter(func(n): return is_equal_approx(n.start_beat, 6.5))
+	_check(at_click.size() == 1, "on the grid where it was clicked")
+	player.seek(tl.note_seconds("Kick", 6.5) + 0.02)
+	_check(light.light_energy > 2.0, "and the player plays it (%.2f)" % light.light_energy)
+
+	# Drag it a quarter beat later: it snaps to the 1/16 grid.
+	var from: Vector2 = panel.lane_point("Kick", 6.5) + Vector2(2, 0)
+	var to: Vector2 = panel.lane_point("Kick", 6.77) + Vector2(2, 0)
+	_click(panel, from, true)
+	var motion := InputEventMouseMotion.new()
+	motion.position = to
+	panel._on_canvas_input(motion)
+	_click(panel, to, false)
+	var starts: Array = tl.get_notes("Kick").map(func(n): return n.start_beat)
+	_check(starts.has(6.75) and not starts.has(6.5), "dragging moves the note, snapped to the grid")
+	_key(panel, KEY_LEFT)
+	starts = tl.get_notes("Kick").map(func(n): return n.start_beat)
+	_check(starts.has(6.5), "Left moves the selection one grid step back")
+	_key(panel, KEY_DELETE)
+	_check(tl.get_note_count("Kick") == count, "Delete removes it")
+	_key(panel, KEY_Z, true)
+	_check(tl.get_note_count("Kick") == count + 1, "Ctrl+Z brings it back")
+	_key(panel, KEY_Z, true, true)
+	_check(tl.get_note_count("Kick") == count, "Ctrl+Shift+Z removes it again")
+
+	var before: float = tl.note_seconds("Kick", 8.0)
+	panel.nudge(0.010)
+	_check(absf(tl.note_seconds("Kick", 8.0) - before - 0.010) < 1e-6 and is_equal_approx(tl.get_nudge(), 0.010),
+			"Nudge moves the grid and notes 10 ms")
+	panel.add_lane("Crash")
+	panel.add_note("Crash", 4.0)
+	_check(tl.get_note_count("Crash") == 1, "a new lane takes notes")
+
+	_check(panel.save() == OK and FileAccess.file_exists(TEMPO) and FileAccess.file_exists(SEQUENCE),
+			"Save writes the .tempo.json and .nseq.json")
+	var tempo_doc = JSON.parse_string(FileAccess.get_file_as_string(TEMPO))
+	var seq_doc = JSON.parse_string(FileAccess.get_file_as_string(SEQUENCE))
+	_check(tempo_doc is Dictionary and tempo_doc.format == "ztrip.tempo" and is_equal_approx(tempo_doc.nudge_s, 0.010),
+			"the tempo file keeps the nudge")
+	_check(seq_doc is Dictionary and seq_doc.format == "ztrip.nseq" and seq_doc.lanes.size() == 4, "the sequence file has all four lanes")
+	panel.queue_free()
+	scene.free()
+	await process_frame
+
+	# A fresh player loads the saved files instead of drafting.
+	var again: Node = ClassDB.instantiate("ZtripPlayer")
+	again.threaded_loading = false
+	again.audio_file = WAV
+	again.tempo_file = TEMPO
+	again.sequence_file = SEQUENCE
+	root.add_child(again)
+	await process_frame
+	again.wait_until_loaded()
+	var tl2 = again.get_timeline()
+	_check(tl2.get_note_count("Kick") == count and tl2.get_note_count("Crash") == 1 and is_equal_approx(tl2.get_nudge(), 0.010),
+			"a new player loads the saved timeline")
+	_check(not ("drafted" in again.get_status()), "and doesn't draft over it")
+	again.free()
+
+
+func _click(panel: Control, pos: Vector2, pressed: bool) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = pressed
+	e.position = pos
+	panel._on_canvas_input(e)
+
+
+func _key(panel: Control, key: Key, ctrl := false, shift := false) -> void:
+	var e := InputEventKey.new()
+	e.keycode = key
+	e.pressed = true
+	e.ctrl_pressed = ctrl
+	e.shift_pressed = shift
+	panel._on_canvas_input(e)
+
+
+func _write_lane_graph(path: String) -> void:
+	var doc := {
+		"format": "ztrip.mgraph", "version": 1, "name": "lane test",
+		"nodes": [
+			{"id": "kick", "type": "NoteLane", "params": {"lane": "Kick"}},
+			{"id": "flash", "type": "ImpulseDecay", "params": {"decay_ms": 150, "velocity": false}},
+			{"id": "gain", "type": "Multiply", "params": {"b": 4}},
+			{"id": "light", "type": "PropertyOut", "params": {"target": "Key:light_energy"}},
+		],
+		"edges": [
+			{"from": "kick.trigger", "to": "flash.trigger"},
+			{"from": "flash.out", "to": "gain.a"},
+			{"from": "gain.out", "to": "light.in"},
+		],
+		"macros": [],
+	}
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(doc, "  "))
+	f.close()
 
 
 # A kick drum every beat: a decaying 55 Hz sine with a click, 16-bit mono.

@@ -62,6 +62,9 @@ public:
     PackedStringArray get_event_names() const;
     // A Continuous signal (e.g. "env.Bass", "rms") at time t; 0 if unknown.
     double sample(const String& signal, double t) const;
+    // The loudest value of a signal in each of `count` equal slices of
+    // [t0, t1], for drawing waveforms.
+    PackedFloat32Array get_signal_peaks(const String& signal, double t0, double t1, int count) const;
     PackedFloat64Array get_event_times(const String& events) const;
     PackedFloat32Array get_event_velocities(const String& events) const;
     PackedFloat64Array get_beats() const;
