@@ -22,6 +22,11 @@ add_executable(ztrip_tests
   test_graph_determinism.cpp
   test_graph_reference.cpp
   test_mgraph.cpp
+  test_tempo_map.cpp
+  test_note_sequence.cpp
+  test_autodraft.cpp
+  test_nseq.cpp
+  test_graph_timeline.cpp
 )
 target_link_libraries(ztrip_tests PRIVATE ztrip::core Catch2::Catch2WithMain)
 target_compile_definitions(ztrip_tests PRIVATE ZTRIP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

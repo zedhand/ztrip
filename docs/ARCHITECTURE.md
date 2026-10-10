@@ -108,6 +108,20 @@ Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of
 
 `Evaluator::outputs()` lists each `PropertyOut` target and value; `port_value(node, port)` reads any port for previews.
 
+## Musical time (Phase 4, core)
+
+`ztrip::time` holds authored timing in beats and converts to seconds only when evaluating.
+
+1. **Tempo map:** `TempoMap` has tempo segments (`start_beat`, `bpm_start`, `bpm_end`, curve `step` / `linear` / `exponential`), time-signature changes at bar boundaries, a song offset (time of beat 0, the first downbeat) and a separate nudge for alignment by ear, plus `scale_tempo` for a grid that runs slightly fast or slow. `seconds_at` and `beat_at` use each curve's closed-form integral and its inverse; `position_at` gives bar, beat and phases under the meter in force.
+2. **Timeline sync:** `tempo_map_from_beats` turns the analysed beat grid into a tempo map that passes through the detected beats, with steady runs merged into single segments.
+3. **Note Sequences:** a `NoteSequence` has named `Lane`s of `Note`s (`start_beat`, `length_beats`, `velocity`, optional `pitch`, `envelope_ref`) and `Envelope`s (ADSR in beats, or a curve drawn over the note). Each lane has swing (0 straight, 1/3 triplet) on a swing division. `parse_grid` / `snap` cover 1/1 to 1/64 grids and triplets.
+4. **Lookup:** `LaneTimeline` resolves a lane through a tempo map (swing applied) into notes in seconds and answers gate, note starts in a tick and envelope level at any time by binary search, so evaluation stays a pure function of time.
+5. **Auto-draft:** `auto_draft` maps event lists to lanes (default: `kick` events, else `onset.Sub`, to `Kick`), drops ghost hits, quantizes to the grid when the grid point is close and keeps the strongest hit per grid step.
+6. **Graph:** the `NoteLane` node outputs a lane's gate, triggers, envelope and velocity. `Evaluator::bind_tempo` / `bind_sequence` bind tempo maps and sequences by slot, and `BeatClock` follows a bound tempo map.
+7. **Files:** `.nseq.json` (`serialize::load_nseq` / `save_nseq`) and `.tempo.json` (`serialize::load_tempo_map` / `save_tempo_map`), versioned with migration tables like `.mgraph.json`.
+
+`analyze-cli` writes `<name>.tempo.json` and `<name>.nseq.json` next to its CSVs; `--clicks` adds `kick_clicks.wav`, the track with a click on every drafted kick. On reference track 01 the drafted kick lane matches 99% of the true kicks within 20 ms (mean error under 1 ms), with 99% precision.
+
 ## Persisted formats
 
 All JSON formats are versioned and carry migrations.
@@ -116,6 +130,7 @@ All JSON formats are versioned and carry migrations.
 | --- | --- |
 | `project.json` | tempo map, audio sources and their analysis settings, stem files, graph and sequence references |
 | `*.mgraph.json` | nodes (`id`, `type`, `params`, `pos`), edges (`from.node.port` -> `to.node.port`), exposed macro controls, layer settings |
+| `*.tempo.json` | tempo segments, time signatures, offset and nudge (to be embedded in `project.json`) |
 | `*.nseq.json` | lanes, notes (`start_beat`, `length_beats`, `velocity`, `pitch`, `envelope_ref`), envelopes |
 | `*.sigcache` | binary offline buffers, keyed by audio file hash + analysis settings hash; regenerated on change |
 | `bindings.json` | target property paths per host, e.g. `/Game/Lights/Key.Intensity` (UE), `Lights/Key:light_energy` (Godot) |

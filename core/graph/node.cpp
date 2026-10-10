@@ -21,6 +21,25 @@ const T& param_or_default(const NodeSetup& setup, std::string_view name) {
     throw std::logic_error("param '" + std::string(name) + "' has another kind");
 }
 
+template <typename T>
+void bind_slot(std::vector<std::pair<std::string, const T*>>& slots, std::string slot, const T* value) {
+    for (auto& s : slots) {
+        if (s.first == slot) {
+            s.second = value;
+            return;
+        }
+    }
+    slots.emplace_back(std::move(slot), value);
+}
+
+template <typename T>
+const T* find_slot(const std::vector<std::pair<std::string, const T*>>& slots, std::string_view slot) noexcept {
+    for (const auto& s : slots) {
+        if (s.first == slot) return s.second;
+    }
+    return nullptr;
+}
+
 template <typename Ports>
 int index_of(const Ports& ports, std::string_view name) {
     for (std::size_t i = 0; i < ports.size(); ++i) {
@@ -48,20 +67,24 @@ const NodeDoc* GraphDoc::find_node(const std::string& id) const noexcept {
 }
 
 void SourceSet::bind(std::string slot, const analysis::AnalysisResult* result) {
-    for (auto& s : slots_) {
-        if (s.first == slot) {
-            s.second = result;
-            return;
-        }
-    }
-    slots_.emplace_back(std::move(slot), result);
+    bind_slot(slots_, std::move(slot), result);
+}
+const analysis::AnalysisResult* SourceSet::find(std::string_view slot) const noexcept {
+    return find_slot(slots_, slot);
 }
 
-const analysis::AnalysisResult* SourceSet::find(std::string_view slot) const noexcept {
-    for (const auto& s : slots_) {
-        if (s.first == slot) return s.second;
-    }
-    return nullptr;
+void SourceSet::bind_tempo(std::string slot, const time::TempoMap* tempo) {
+    bind_slot(tempos_, std::move(slot), tempo);
+}
+const time::TempoMap* SourceSet::find_tempo(std::string_view slot) const noexcept {
+    return find_slot(tempos_, slot);
+}
+
+void SourceSet::bind_sequence(std::string slot, const time::NoteSequence* sequence) {
+    bind_slot(sequences_, std::move(slot), sequence);
+}
+const time::NoteSequence* SourceSet::find_sequence(std::string_view slot) const noexcept {
+    return find_slot(sequences_, slot);
 }
 
 double NodeSetup::number(std::string_view param) const { return param_or_default<double>(*this, param); }

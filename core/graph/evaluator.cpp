@@ -57,6 +57,18 @@ void Evaluator::bind_source(std::string slot, const analysis::AnalysisResult* re
     clear_checkpoints();
 }
 
+void Evaluator::bind_tempo(std::string slot, const time::TempoMap* tempo) {
+    sources_.bind_tempo(std::move(slot), tempo);
+    for (auto& n : graph_->nodes) n.impl->bind(sources_);
+    clear_checkpoints();
+}
+
+void Evaluator::bind_sequence(std::string slot, const time::NoteSequence* sequence) {
+    sources_.bind_sequence(std::move(slot), sequence);
+    for (auto& n : graph_->nodes) n.impl->bind(sources_);
+    clear_checkpoints();
+}
+
 bool Evaluator::set_macro(std::string_view name, double value) {
     for (const CompiledMacro& m : graph_->macros) {
         if (m.name != name) continue;
