@@ -48,7 +48,7 @@ options:
   --hold MS             envelope hold in ms (default 0)
   --sensitivity X       onset threshold multiplier, lower = more onsets (default 1.5)
   --min-gap MS          minimum time between onsets in ms (default 50)
-  --kick-rise DB        level jump a kick needs, higher = fewer kicks (default 9)
+  --kick-rise DB        level jump a kick needs, higher = fewer kicks (default 12)
   --bpm-prior BPM       centre of the tempo prior (default 120)
   --beats-per-bar N     beats per bar for downbeats (default 4)
   --no-cache            ignore any existing .sigcache
