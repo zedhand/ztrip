@@ -1,6 +1,6 @@
 # Getting started (beta)
 
-This guide is for beta testers. It walks you through building ztrip, running the analyser on a song of your own, and reading what it found. The Godot editor addon and the timeline are still being built; their sections below are placeholders and will be filled in as they land.
+This guide is for beta testers. It walks you through building ztrip, running the analyser on a song of your own, and reading what it found. The timeline is still being built; its section below is a placeholder and will be filled in when it lands.
 
 If something here does not match what you see, that is worth reporting too (see [Reporting problems](#reporting-problems)).
 
@@ -10,7 +10,7 @@ If something here does not match what you see, that is worth reporting too (see 
 | --- | --- | --- |
 | Audio analysis (`analyze-cli`) | Ready for testing | [Analyse a song](#analyse-a-song) |
 | Motion Graph core | Works from C++ only | [Motion Graphs](#motion-graphs) |
-| Godot addon | In progress | [Godot addon](#godot-addon-coming-soon) |
+| Godot addon | Ready for testing | [Godot addon](#godot-addon) |
 | Timeline, tempo map and note lanes | In progress | [Timeline](#timeline-coming-soon) |
 
 Supported platforms for the beta are Windows 11 and Linux. macOS is not supported yet.
@@ -142,18 +142,28 @@ Changing any option recomputes the analysis automatically.
 
 A Motion Graph is a small `.mgraph.json` file that turns signals into property values, for example "on each kick, flash the key light and let it fade over 150 ms". [`examples/kick_to_light.mgraph.json`](../examples/kick_to_light.mgraph.json) is exactly that, and [`examples/kitchen_sink.mgraph.json`](../examples/kitchen_sink.mgraph.json) uses every node type. [NODES.md](NODES.md) lists the nodes and their settings.
 
-For the beta, graphs only run from C++ (see the README). The Godot addon will load and edit them; until then, you can read the examples to get a feel for the format.
+Graphs run in the Godot addon (below), which also has a panel for editing them, or from C++ (see the README).
 
-## Godot addon (coming soon)
+## Godot addon
 
-> **Placeholder.** The Godot 4 host is being built now and this section will be written when it lands.
+You need [Godot 4.5 or newer](https://godotengine.org/download) (the standard build, not .NET) and the build tools from [Build from source](#build-from-source).
 
-What it will cover:
+1. Build the addon from the ztrip folder (the first build takes several minutes):
 
-- Which Godot 4 version to use and how to install the addon into a project.
-- Adding a song and analysing it from inside the editor.
-- Opening a Motion Graph in the graph editor and binding its outputs to lights, materials and the camera.
-- Playing and scrubbing the song in the editor, outside Play mode.
+   ```sh
+   cmake --preset godot
+   cmake --build --preset godot
+   ```
+
+2. In Godot's Project Manager, choose **Import** and open `hosts/godot/project/project.godot`.
+3. Copy a WAV into the project's `music/` folder (it shows up in the FileSystem dock). If Godot reports "Format not supported for WAVE file", re-save it as 16-bit PCM: `ffmpeg -i song.wav -c:a pcm_s16le song16.wav`.
+4. Open `demo/stage.tscn`, select the `Music` node and drag your WAV onto its **Stream** in the inspector.
+5. Select the `ZtripPlayer` node. After a second or two its **Status** shows the song's length and tempo.
+6. Drag **Time** to scrub, or tick **Playing** to hear the song while the scene reacts, without pressing Play. Press F5 to run the stage full screen with its beat counter.
+
+What to look for: the red light flashes with the kick drum, the blue spotlight with the snare, the white light with hi-hats, the orb glows with the bass and flashes on every beat, and the camera pushes in at the start of each bar. If the song has a part without drums, those lights go dark there.
+
+The **Motion Graph** panel at the bottom of the editor shows the graph that does this, with each output's live value. Change a number (for example `kick_flash`'s `decay_ms`) and **Save**: the scene picks it up straight away. The sliders under **Macros** in the `ZtripPlayer` inspector are quick controls for the same graph. [hosts/godot/README.md](../hosts/godot/README.md) explains how to point a graph at your own lights, materials and cameras.
 
 ## Timeline (coming soon)
 
@@ -167,7 +177,7 @@ What it will cover:
 
 ## Known limitations
 
-- Input must be WAV; convert other formats first.
+- Input must be WAV; convert other formats first. In Godot, WAVs must be plain PCM (see [Godot addon](#godot-addon)).
 - Songs played live (not to a click) can drift in tempo. The beat grid is a single fixed tempo for now, so it can slide onto the off-beat in places. The tempo map in the timeline will fix this.
 - The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick.
 - No live input yet (microphone, MIDI, OSC, DMX). That comes after the beta.
