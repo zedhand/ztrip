@@ -50,6 +50,17 @@ struct Score {
     double mean_abs_error = 0.0;
 };
 
+// Reads the number stored under "key": in the truth file.
+double truth_number(const fs::path& file, const std::string& key) {
+    std::ifstream in(file);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    const std::string text = ss.str();
+    const auto at = text.find("\"" + key + "\"");
+    REQUIRE(at != std::string::npos);
+    return std::stod(text.substr(text.find(':', at) + 1));
+}
+
 Score score(const std::vector<analysis::Trigger>& det, const std::vector<double>& ref, double tol) {
     std::vector<bool> used(det.size(), false);
     std::size_t hits = 0;
@@ -166,4 +177,55 @@ TEST_CASE("track 01: the auto-drafted kick lane lands within 20 ms of true kicks
     CHECK(kick.recall >= 0.99);
     CHECK(kick.precision >= 0.99);
     CHECK(kick.mean_abs_error < 0.003);
+}
+
+TEST_CASE("genre tracks 04-12 match their ground truth", "[reference]") {
+    const fs::path dir = reference_dir();
+    if (dir.empty()) SKIP("set ZTRIP_REFERENCE_TRACKS to the reference-tracks folder to run");
+    // Metal, EDM and rock with ground truth (see the folder's README). 04-08
+    // and 12 are human drummers from E-GMD; their truth includes ghost
+    // notes, which the detectors skip by design, so recall there is lower.
+    // The floors sit a little under the results when the detectors were
+    // tuned, to catch regressions. F is the harmonic mean of precision and
+    // recall; tolerances are 70 ms for beats, 25 ms for kicks, 30 ms for snares.
+    struct Expect {
+        const char* name;
+        double tempo_ratio; // reported BPM / true BPM
+        double beat_f, kick_f, snare_f;
+    };
+    const auto f_of = [](const Score& s) {
+        return s.precision + s.recall > 0.0 ? 2.0 * s.precision * s.recall / (s.precision + s.recall) : 0.0;
+    };
+    int ran = 0;
+    for (const Expect e : {
+             Expect{"04_egmd_speed_metal_180bpm", 1.0, 0.95, 0.80, 0.68},
+             Expect{"05_egmd_hard_rock_135bpm", 1.0, 0.95, 0.75, 0.65},
+             Expect{"06_egmd_rock_128bpm", 1.0, 0.95, 0.76, 0.40},
+             Expect{"07_egmd_disco_house_120bpm", 1.0, 0.95, 0.78, 0.70},
+             // Known gap: drum and bass reads at half tempo (85 BPM), so beats are every other one.
+             Expect{"08_egmd_dnb_170bpm", 0.5, 0.0, 0.77, 0.33},
+             Expect{"09_synth_metal_190bpm", 1.0, 0.70, 0.75, 0.90},
+             Expect{"10_synth_edm_sidechain_128bpm", 1.0, 0.95, 0.66, 0.80},
+             Expect{"11_synth_rock_140bpm", 1.0, 0.95, 0.71, 0.95},
+             Expect{"12_egmd_fast_rock_200bpm", 1.0, 0.95, 0.73, 0.40},
+         }) {
+        const fs::path wav = dir / (std::string(e.name) + ".wav");
+        const fs::path truth = dir / (std::string(e.name) + ".truth.json");
+        if (!fs::exists(wav) || !fs::exists(truth)) continue;
+        ++ran;
+        const auto r = analysis::analyze(io::read_wav(wav), {});
+        const double bpm = truth_number(truth, "bpm");
+        const Score beats = score(r.find_events("beat")->events, truth_times(truth, "beats"), 0.070);
+        const Score kicks = score(r.find_events("kick")->events, truth_times(truth, "kick"), 0.025);
+        const Score snares = score(r.find_events("snare")->events, truth_times(truth, "snare"), 0.030);
+        INFO(e.name << ": " << r.beats.bpm << " BPM (true " << bpm << "), beats F=" << f_of(beats) << ", kicks P="
+                    << kicks.precision << " R=" << kicks.recall << ", snares P=" << snares.precision
+                    << " R=" << snares.recall);
+        CHECK(r.beats.bpm / bpm == Catch::Approx(e.tempo_ratio).epsilon(0.02));
+        CHECK(f_of(beats) >= e.beat_f);
+        CHECK(f_of(kicks) >= e.kick_f);
+        CHECK(kicks.mean_abs_error < 0.015);
+        CHECK(f_of(snares) >= e.snare_f);
+    }
+    if (ran == 0) SKIP("genre tracks 04-12 not present");
 }
