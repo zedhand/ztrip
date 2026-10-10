@@ -31,6 +31,12 @@
 #include <string>
 #include <string_view>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 namespace fs = std::filesystem;
 using namespace ztrip;
 
@@ -41,7 +47,7 @@ constexpr std::string_view kUsage = R"(usage: analyze-cli <input.wav> [options]
 Runs offline analysis (bands, envelopes, onsets, beats) and writes:
   <out>/<name>.sigcache   binary analysis cache, reused when unchanged
   <out>/signals.csv       120 Hz signals (band.*, env.*, rms, centroid)
-  <out>/events.csv        onsets per band, beats and downbeats
+  <out>/events.csv        onsets per band, kicks, beats and downbeats
   <out>/<name>.tempo.json tempo map fitted to the detected beats
   <out>/<name>.nseq.json  Note Sequence with an auto-drafted Kick lane
   <out>/beats.csv         beat grid with bar/beat numbers
@@ -58,6 +64,7 @@ options:
   --hold MS             envelope hold in ms (default 0)
   --sensitivity X       onset threshold multiplier, lower = more onsets (default 1.5)
   --min-gap MS          minimum time between onsets in ms (default 50)
+  --kick-rise DB        level jump a kick needs, higher = fewer kicks (default 12)
   --bpm-prior BPM       centre of the tempo prior (default 120)
   --beats-per-bar N     beats per bar for downbeats (default 4)
   --grid G              auto-draft grid, 1/1..1/64, T for triplets (default 1/16)
@@ -152,6 +159,8 @@ std::optional<int> parse_args(int argc, char** argv, Options& opt) {
             float ms = 0.0f;
             if (!number(ms)) return 2;
             s.onsets.min_gap_s = ms / 1000.0f;
+        } else if (arg == "--kick-rise") {
+            if (!number(s.kick.min_rise_db) || s.kick.min_rise_db <= 0.0f) return 2;
         } else if (arg == "--bpm-prior") {
             if (!number(s.beats.prior_bpm) || s.beats.prior_bpm <= 0.0f) return 2;
         } else if (arg == "--beats-per-bar") {
@@ -289,6 +298,10 @@ std::vector<float> click_mix(const io::AudioBuffer& audio, const time::Lane& lan
 } // namespace
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    // utf8.manifest makes argv and paths UTF-8; print file names the same way.
+    SetConsoleOutputCP(CP_UTF8);
+#endif
     Options opt;
     if (const auto code = parse_args(argc, argv, opt)) return *code;
 
@@ -333,7 +346,7 @@ int main(int argc, char** argv) {
         std::printf("tempo     %.2f BPM, %zu beats, %zu downbeats\n", r.beats.bpm,
                     r.beats.beats.size(), r.beats.downbeats.size());
         for (const auto& list : r.events) {
-            if (list.name.rfind("onset.", 0) == 0) {
+            if (list.name.rfind("onset.", 0) == 0 || list.name == "kick") {
                 std::printf("%-16s %zu\n", list.name.c_str(), list.events.size());
             }
         }
@@ -347,7 +360,12 @@ int main(int argc, char** argv) {
             write_wav16(clicks, click_mix(audio, draft.lanes.front(), tempo), audio.sample_rate);
             std::printf("clicks    %s\n", clicks.string().c_str());
         }
-        std::printf("plots     python3 %s\n", (opt.out / "plot.py").string().c_str());
+#ifdef _WIN32
+        constexpr const char* python = "py"; // the python.org launcher
+#else
+        constexpr const char* python = "python3";
+#endif
+        std::printf("plots     %s %s\n", python, (opt.out / "plot.py").string().c_str());
     } catch (const std::exception& e) {
         std::cerr << "analyze-cli: " << e.what() << '\n';
         return 1;

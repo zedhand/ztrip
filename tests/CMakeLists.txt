@@ -14,6 +14,7 @@ add_executable(ztrip_tests
   test_stft.cpp
   test_envelope.cpp
   test_onsets.cpp
+  test_kick.cpp
   test_beats.cpp
   test_pipeline.cpp
   test_reference_tracks.cpp
@@ -34,3 +35,12 @@ ztrip_set_warnings(ztrip_tests)
 
 include(Catch)
 catch_discover_tests(ztrip_tests)
+
+if(TARGET ztrip_analyze)
+  # Song names are often outside the Windows code page. The file doesn't
+  # exist, so this checks that the name reaches the error message intact.
+  add_test(NAME "analyze-cli keeps non-ASCII file names intact"
+           COMMAND ztrip_analyze "Пёс_テスト_Motörhead.wav")
+  set_tests_properties("analyze-cli keeps non-ASCII file names intact" PROPERTIES
+    PASS_REGULAR_EXPRESSION "cannot open Пёс_テスト_Motörhead\\.wav")
+endif()

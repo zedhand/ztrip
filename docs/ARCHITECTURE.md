@@ -86,7 +86,8 @@ Every input becomes a typed signal. Every graph evaluation is a function of (tim
 4. **Envelopes:** the spec's attack/release follower (plus optional hold) over each 120 Hz band level, as `env.<Name>`.
 5. **Onsets:** per-band SuperFlux-style spectral flux (log magnitude increase against the previous frame max-filtered over +-1 bin, averaged over the band), median-adaptive threshold, minimum gap, parabolic peak refinement. Events `onset.<Name>` and `onset.full`, velocity = normalised flux.
 6. **Tempo and beats:** onset strength is the sum of the default bands' normalised flux from Bass upwards (equal weight, so hats don't drown out kick and snare). Each candidate tempo scores the autocorrelation at its period plus at half its period (the subdivision), weighted by a log-normal prior (120 BPM, 0.5 octave); beats from Ellis-style dynamic programming at that tempo; downbeats from the beat phase with the most low-band onsets and harmonic change and the fewest backbeat (1.5-6 kHz) onsets. Events `beat` and `downbeat`.
-7. **Extras:** `rms` (dB, normalised) and `centroid` (log-frequency 20 Hz-20 kHz mapped to 0-1).
+7. **Kicks:** a dedicated time-domain detector, separate from the band onsets. The mono signal goes through a 150 Hz 4th-order Butterworth low-pass; its energy over a centred 10 ms window is taken in dB every 2.5 ms. A kick is a jump of at least 12 dB within 10 ms that peaks within 20 dB of the track's loud low end (99th percentile), at least 50 ms after the previous one. Time is the centre of the steepest rise, velocity the peak amplitude relative to the loud low end. Events `kick`; the CLI's `--kick-rise` moves the 12 dB threshold.
+8. **Extras:** `rms` (dB, normalised) and `centroid` (log-frequency 20 Hz-20 kHz mapped to 0-1).
 
 Offline buffers are pure functions of the file and settings, so `AnalysisResult::sample(signal, t)` is a lookup and results are bit-for-bit repeatable.
 

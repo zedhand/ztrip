@@ -6,6 +6,7 @@ add_library(ztrip_core STATIC
   analysis/bands.cpp
   analysis/envelope.cpp
   analysis/onsets.cpp
+  analysis/kick.cpp
   analysis/beats.cpp
   analysis/offline.cpp
   serialize/sigcache.cpp
