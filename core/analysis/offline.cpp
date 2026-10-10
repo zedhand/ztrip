@@ -31,7 +31,7 @@ private:
 
 // Bumped whenever the pipeline changes in a way that alters its output, so
 // old caches are regenerated.
-constexpr std::uint32_t kPipelineVersion = 3;
+constexpr std::uint32_t kPipelineVersion = 5;
 
 } // namespace
 
@@ -100,7 +100,13 @@ AnalysisResult analyze(std::span<const float> mono, int sample_rate, const Analy
     const float nyquist = static_cast<float>(sample_rate) / 2.0f;
     const std::vector<float> full_flux = band_flux(spec, {"full", 20.0f, std::min(16000.0f, nyquist)});
     r.events.push_back({"onset.full", pick_onsets(full_flux, fr, settings.onsets)});
-    r.events.push_back({"kick", detect_kicks(mono, sample_rate, settings.kick)});
+    std::vector<Trigger> kicks = detect_kicks(mono, sample_rate, settings.kick);
+    std::vector<Trigger> snares = detect_snares(mono, sample_rate, settings.snare);
+    std::vector<Trigger> drum_hits(kicks);
+    drum_hits.insert(drum_hits.end(), snares.begin(), snares.end());
+    std::sort(drum_hits.begin(), drum_hits.end(), [](const Trigger& a, const Trigger& b) { return a.time < b.time; });
+    r.events.push_back({"kick", std::move(kicks)});
+    r.events.push_back({"snare", std::move(snares)});
 
     // Beat tracking listens to the default bands with equal weight, so the
     // many high-frequency bins (hats) don't outvote the kick and snare. Sub
@@ -114,7 +120,7 @@ AnalysisResult analyze(std::span<const float> mono, int sample_rate, const Analy
         const float scale = std::max(percentile(flux, 99.0f), settings.onsets.min_scale);
         for (std::size_t f = 0; f < spec.frames; ++f) beat_strength[f] += flux[f] / scale;
     }
-    r.beats = analyze_beats(spec, beat_strength, settings.beats);
+    r.beats = analyze_beats(spec, beat_strength, settings.beats, drum_hits);
     EventList beats{"beat", {}};
     EventList downbeats{"downbeat", {}};
     for (double t : r.beats.beats) beats.events.push_back({t, 1.0f});
@@ -172,16 +178,34 @@ std::uint64_t settings_hash(const AnalysisSettings& s) {
     h.add(s.kick.window_ms);
     h.add(s.kick.hop_ms);
     h.add(s.kick.lag_ms);
-    h.add(s.kick.min_rise_db);
+    h.add(s.kick.min_jump);
+    h.add(s.kick.reference_s);
     h.add(s.kick.gate_db);
-    h.add(s.kick.range_db);
+    h.add(s.kick.floor_db);
     h.add(s.kick.min_gap_s);
+    h.add(s.snare.window_ms);
+    h.add(s.snare.hop_ms);
+    h.add(s.snare.lag_ms);
+    h.add(s.snare.min_jump);
+    h.add(s.snare.min_high_jump);
+    h.add(s.snare.reference_s);
+    h.add(s.snare.floor_db);
+    h.add(s.snare.gate_db);
+    h.add(s.snare.high_gate_db);
+    h.add(s.snare.body_gate_db);
+    h.add(s.snare.max_decay_db);
+    h.add(s.snare.min_gap_s);
     h.add(s.beats.min_bpm);
     h.add(s.beats.max_bpm);
     h.add(s.beats.prior_bpm);
     h.add(s.beats.prior_octaves);
     h.add(s.beats.tightness);
     h.add(s.beats.beats_per_bar);
+    h.add(s.beats.drum_weight);
+    h.add(s.beats.min_drum_fit);
+    h.add(s.beats.min_drum_precision);
+    h.add(s.beats.check_tightness);
+    h.add(s.beats.drum_fit_margin);
     h.add(s.signal_rate_hz);
     return h.value();
 }

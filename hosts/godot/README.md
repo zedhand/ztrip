@@ -187,8 +187,10 @@ overwrites edits made in the editor).
 ## Known gaps
 
 - WAV only, and Godot itself only plays plain PCM WAVs: files saved as
-  `WAVE_FORMAT_EXTENSIBLE` (common for 24-bit) import with an error. Re-save
-  them, e.g. `ffmpeg -i in.wav -c:a pcm_s16le out.wav`.
+  `WAVE_FORMAT_EXTENSIBLE` (common for 24-bit and float) import with an
+  error. With the plugin enabled, the editor rewrites such a file's header
+  as plain PCM or float in place (the samples are untouched) and reimports
+  it, so this shows as one error and a "ztrip: rewrote the header" line.
 - One song (or one live input) per player, bound to the graph's `main` source slot.
 - Targets take one number each; colours and vectors are driven per component.
 - Graph layers and blend modes, undo/redo in the Motion Graph panel and

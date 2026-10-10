@@ -269,13 +269,93 @@ int estimate_downbeat_phase(const Spectrogram& spec, std::span<const double> bea
     return best_phase;
 }
 
+DrumFit drum_fit(std::span<const double> beats, std::span<const Trigger> hits) {
+    DrumFit fit;
+    if (beats.size() < 4 || hits.empty()) return fit;
+    std::vector<double> ibi(beats.size() - 1);
+    for (std::size_t i = 0; i + 1 < beats.size(); ++i) ibi[i] = beats[i + 1] - beats[i];
+    std::nth_element(ibi.begin(), ibi.begin() + static_cast<std::ptrdiff_t>(ibi.size() / 2), ibi.end());
+    const double period = ibi[ibi.size() / 2];
+    const double tol = std::min(0.05, period / 6.0);
+
+    std::vector<double> times;
+    double total = 0.0;
+    double on_beat = 0.0;
+    for (const Trigger& h : hits) {
+        if (h.time < beats.front() - period / 2 || h.time > beats.back() + period / 2) continue;
+        times.push_back(h.time);
+        total += h.velocity;
+        const auto it = std::lower_bound(beats.begin(), beats.end(), h.time);
+        double d = std::numeric_limits<double>::infinity();
+        if (it != beats.end()) d = *it - h.time;
+        if (it != beats.begin()) d = std::min(d, h.time - *(it - 1));
+        if (d <= tol) on_beat += h.velocity;
+    }
+    if (times.empty() || total <= 0.0) return fit;
+    std::sort(times.begin(), times.end());
+    std::size_t with_hit = 0;
+    for (double b : beats) {
+        const auto it = std::lower_bound(times.begin(), times.end(), b);
+        double d = std::numeric_limits<double>::infinity();
+        if (it != times.end()) d = *it - b;
+        if (it != times.begin()) d = std::min(d, b - *(it - 1));
+        if (d <= tol) ++with_hit;
+    }
+    fit.precision = static_cast<double>(with_hit) / static_cast<double>(beats.size());
+    fit.recall = on_beat / total;
+    const double sum = fit.precision + fit.recall;
+    fit.f = sum > 0.0 ? 2.0 * fit.precision * fit.recall / sum : 0.0;
+    return fit;
+}
+
 BeatGrid analyze_beats(const Spectrogram& spec, std::span<const float> onset_strength,
-                       const BeatSettings& settings) {
+                       const BeatSettings& settings, std::span<const Trigger> drum_hits) {
     BeatGrid grid;
     grid.beats_per_bar = std::max(1, settings.beats_per_bar);
     const double fr = spec.frame_rate();
-    const double tempo = estimate_tempo(onset_strength, fr, settings);
-    grid.beats = track_beats(onset_strength, fr, tempo, settings);
+    double tempo = estimate_tempo(onset_strength, fr, settings);
+
+    std::vector<float> steered(onset_strength.begin(), onset_strength.end());
+    if (!drum_hits.empty() && tempo > 0.0) {
+        // Check the related tempos against the drum hits. The candidates are
+        // tracked on the plain onset strength so each gets the same footing.
+        BeatSettings check = settings;
+        check.tightness = settings.check_tightness;
+        const DrumFit base = drum_fit(track_beats(onset_strength, fr, tempo, check), drum_hits);
+        double best_f = base.f;
+        const double estimate = tempo;
+        for (const double m : {0.5, 2.0 / 3.0, 1.5, 2.0}) {
+            const double candidate = estimate * m;
+            if (candidate < settings.min_bpm || candidate > settings.max_bpm) continue;
+            const DrumFit fit = drum_fit(track_beats(onset_strength, fr, candidate, check), drum_hits);
+            if (fit.f >= settings.min_drum_fit && fit.precision >= settings.min_drum_precision &&
+                fit.f - base.f >= settings.drum_fit_margin && fit.f > best_f) {
+                best_f = fit.f;
+                tempo = candidate;
+            }
+        }
+
+        // Track on the onset strength plus a curve of the drum hits (each a
+        // 10 ms Gaussian scaled by velocity), both conditioned to unit scale.
+        std::vector<float> drums(onset_strength.size(), 0.0f);
+        const double sigma = 0.010 * fr;
+        const auto reach = static_cast<std::ptrdiff_t>(std::ceil(3.0 * sigma));
+        const auto n = static_cast<std::ptrdiff_t>(drums.size());
+        for (const Trigger& h : drum_hits) {
+            const auto c = static_cast<std::ptrdiff_t>(std::lround(h.time * fr));
+            for (std::ptrdiff_t k = -reach; k <= reach; ++k) {
+                const std::ptrdiff_t j = c + k;
+                if (j < 0 || j >= n) continue;
+                const double x = static_cast<double>(k) / sigma;
+                drums[static_cast<std::size_t>(j)] += static_cast<float>(h.velocity * std::exp(-0.5 * x * x));
+            }
+        }
+        const std::vector<float> o = condition(onset_strength, fr);
+        const std::vector<float> d = condition(drums, fr);
+        for (std::size_t i = 0; i < steered.size(); ++i) steered[i] = o[i] + settings.drum_weight * d[i];
+    }
+
+    grid.beats = track_beats(steered, fr, tempo, settings);
     if (grid.beats.size() >= 2) {
         std::vector<double> ibi(grid.beats.size() - 1);
         for (std::size_t i = 0; i + 1 < grid.beats.size(); ++i) ibi[i] = grid.beats[i + 1] - grid.beats[i];

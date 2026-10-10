@@ -36,7 +36,7 @@ struct LiveSettings {
 // appends to result(), which has the same signal and event names as the
 // offline analyze() (band.<Band>, env.<Band>, rms, centroid, onset.<Band>,
 // onset.full), so a graph switches from a file to live input by rebinding a
-// slot. Beat, downbeat and kick lists exist but stay empty for now.
+// slot. Beat, downbeat, kick and snare lists exist but stay empty for now.
 //
 // Times are on the stream's sample clock (sample count / sample rate) and
 // every value and event is stamped when it becomes known, never earlier, so
