@@ -41,9 +41,8 @@ The workflow runs on:
   archives and `SHA256SUMS.txt`. Nothing is public until the draft is published
   by hand. Tags with a `-` (like `v0.1.0-beta.1`) are marked pre-release.
 - manual dispatch (Actions > Release > Run workflow): builds the archives as
-  workflow artifacts only. Pull requests don't run it (to stay inside the free
-  Actions quota), so dispatch it on a branch that changes the build or
-  packaging before merging.
+  workflow artifacts only.
+- pull requests that touch the build or packaging files: same as dispatch.
 
 To build an archive locally the way the workflow does (on Linux, the
 workflow also passes `-static-libstdc++ -static-libgcc` as linker flags; on

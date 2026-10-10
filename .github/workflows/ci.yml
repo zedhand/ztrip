@@ -1,13 +1,10 @@
 name: CI
 
-# Sized for the free private-repo Actions quota, where Windows minutes count
-# double (see docs/DECISIONS.md):
-# - pull requests that aren't drafts: one Linux GCC release build and tests;
-# - pushes to main: that, plus the Godot host on Linux;
-# - the weekly schedule and manual dispatch (Actions > CI > Run workflow):
-#   everything, adding Windows MSVC and the Godot host on Windows.
-# Docs-only changes skip it all. Compiles (ccache) and the FetchContent
-# downloads are cached; caches are written from main, which pull requests can read.
+# Every push and pull request builds Linux GCC, Linux Clang and Windows MSVC
+# (Debug and Release) and the Godot host on Linux and Windows. Docs-only
+# changes skip it, superseded runs are cancelled, and compiles (ccache) and the
+# FetchContent downloads are cached; caches are written from main, which pull
+# requests can read.
 on:
   push:
     branches: [main]
@@ -16,13 +13,10 @@ on:
       - docs/**
       - LICENSE*
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - '**.md'
       - docs/**
       - LICENSE*
-  schedule:
-    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -38,13 +32,25 @@ env:
 
 jobs:
   build:
-    name: ${{ matrix.name }} (release)
-    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    name: ${{ matrix.name }} (${{ matrix.preset }})
     strategy:
       fail-fast: false
       matrix:
-        # Windows only on the full runs (schedule, dispatch).
-        include: ${{ fromJSON(contains(fromJSON('["schedule","workflow_dispatch"]'), github.event_name) && '[{"name":"Linux GCC","os":"ubuntu-24.04","cc":"gcc","cxx":"g++"},{"name":"Windows MSVC","os":"windows-2022","cc":"cl","cxx":"cl"}]' || '[{"name":"Linux GCC","os":"ubuntu-24.04","cc":"gcc","cxx":"g++"}]') }}
+        preset: [dev, release]
+        name: [Linux GCC, Linux Clang, Windows MSVC]
+        include:
+          - name: Linux GCC
+            os: ubuntu-24.04
+            cc: gcc
+            cxx: g++
+          - name: Linux Clang
+            os: ubuntu-24.04
+            cc: clang
+            cxx: clang++
+          - name: Windows MSVC
+            os: windows-2022
+            cc: cl
+            cxx: cl
     runs-on: ${{ matrix.os }}
     env:
       CC: ${{ matrix.cc }}
@@ -61,31 +67,33 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ninja-build
       - uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: build-${{ matrix.os }}
+          key: build-${{ matrix.os }}-${{ matrix.cc }}-${{ matrix.preset }}
           max-size: 500M
           save: ${{ github.event_name != 'pull_request' }}
       - uses: actions/cache@v4
         with:
           # The downloaded sources only; the dependency builds come from ccache.
           path: |
-            build/release/_deps
-            !build/release/_deps/*-build
-          key: fetchcontent-release-${{ matrix.os }}-${{ hashFiles('cmake/ZtripDependencies.cmake', 'tests/CMakeLists.txt') }}
+            build/${{ matrix.preset }}/_deps
+            !build/${{ matrix.preset }}/_deps/*-build
+          key: fetchcontent-${{ matrix.preset }}-${{ matrix.os }}-${{ hashFiles('cmake/ZtripDependencies.cmake', 'tests/CMakeLists.txt') }}
       - name: Configure
-        run: cmake --preset release -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+        run: cmake --preset ${{ matrix.preset }} -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
       - name: Build
-        run: cmake --build --preset release
+        run: cmake --build --preset ${{ matrix.preset }}
       - name: Test
-        run: ctest --preset release
+        run: ctest --preset ${{ matrix.preset }}
 
   godot:
-    name: Godot host (${{ matrix.os }})
-    if: github.event_name != 'pull_request'
+    name: Godot host (${{ matrix.name }})
     strategy:
       fail-fast: false
       matrix:
-        # Linux on every push to main; Windows only on the full runs.
-        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2022"]') }}
+        include:
+          - name: Linux
+            os: ubuntu-24.04
+          - name: Windows
+            os: windows-2022
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -108,6 +116,7 @@ jobs:
         with:
           key: godot-${{ matrix.os }}
           max-size: 500M
+          save: ${{ github.event_name != 'pull_request' }}
       - uses: actions/cache@v4
         with:
           # The downloaded sources only; the dependency builds come from ccache.
