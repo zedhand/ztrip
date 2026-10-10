@@ -31,6 +31,12 @@
 #include <string>
 #include <string_view>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 namespace fs = std::filesystem;
 using namespace ztrip;
 
@@ -292,6 +298,10 @@ std::vector<float> click_mix(const io::AudioBuffer& audio, const time::Lane& lan
 } // namespace
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    // utf8.manifest makes argv and paths UTF-8; print file names the same way.
+    SetConsoleOutputCP(CP_UTF8);
+#endif
     Options opt;
     if (const auto code = parse_args(argc, argv, opt)) return *code;
 
