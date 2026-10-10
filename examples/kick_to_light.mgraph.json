@@ -1,0 +1,19 @@
+{
+  "format": "ztrip.mgraph",
+  "version": 1,
+  "name": "Kick -> light flash",
+  "nodes": [
+    {"id": "kick", "type": "AudioOnset", "params": {"band": "Sub", "min_velocity": 0.3}, "pos": [0, 0]},
+    {"id": "flash", "type": "ImpulseDecay", "params": {"decay_ms": 150}, "pos": [220, 0]},
+    {"id": "intensity", "type": "Multiply", "pos": [440, 0]},
+    {"id": "light", "type": "PropertyOut", "params": {"target": "Lights/Key:light_energy"}, "pos": [660, 0]}
+  ],
+  "edges": [
+    {"from": "kick.trigger", "to": "flash.trigger"},
+    {"from": "flash.out", "to": "intensity.a"},
+    {"from": "intensity.out", "to": "light.in"}
+  ],
+  "macros": [
+    {"name": "Intensity", "node": "intensity", "param": "b", "min": 0, "max": 16, "default": 4}
+  ]
+}
