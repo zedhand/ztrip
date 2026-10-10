@@ -31,5 +31,8 @@ set(CPACK_COMPONENTS_ALL docs sdk)
 if(TARGET ztrip_analyze)
   list(PREPEND CPACK_COMPONENTS_ALL cli)
 endif()
+if(TARGET ztrip_godot)
+  list(APPEND CPACK_COMPONENTS_ALL godot)
+endif()
 
 include(CPack)
