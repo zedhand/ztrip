@@ -215,7 +215,7 @@ What to look for: the scene follows the fader within a frame. On Linux, MIDI nee
 ## Known limitations
 
 - Input must be WAV; convert other formats first.
-- Songs played live (not to a click) can drift in tempo. The drafted tempo map follows the detected beats, but where the beat tracker slipped onto the off-beat the grid does too; nudge or re-draw those notes in the Timeline.
+- Songs played live (not to a click) can drift in tempo. The drafted tempo map follows the detected beats bar by bar; if a stretch of the grid still sits off the music, nudge it or re-draw those notes in the Timeline.
 - Snare and Hats lanes are drafted from plain band onsets and need cleaning up on busy mixes.
 - Tempo changes can't be drawn in the Timeline yet (only nudged and scaled); edit the `.tempo.json` for that.
 - The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick. The Timeline's Kick lane uses the dedicated kick detector instead.
