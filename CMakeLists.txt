@@ -43,6 +43,7 @@ add_subdirectory(core)
 
 if(ZTRIP_BUILD_TOOLS)
   add_subdirectory(tools/analyze-cli)
+  add_subdirectory(tools/live-cli)
 endif()
 
 if(ZTRIP_BUILD_GODOT)

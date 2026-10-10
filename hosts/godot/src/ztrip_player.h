@@ -6,6 +6,7 @@
 #include "ztrip_timeline.h"
 
 #include "ztrip/graph/evaluator.hpp"
+#include "ztrip/io/audio_capture.hpp"
 
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/templates/list.hpp>
@@ -25,6 +26,11 @@ namespace godot {
 // resolved relative to target_root. It runs in the editor as well, so the
 // scene reacts while you scrub `time` or press `playing` in the inspector.
 // Macros appear in the inspector under "macros/".
+//
+// With live_input on, the graph's "main" slot reads live audio instead of the
+// song: a microphone, what the computer plays (live_loopback), or a WAV file
+// played in real time (live_simulate_file). Capture runs while playing, so
+// the microphone is only opened on play() (or autoplay).
 //
 // The player also holds the song's timeline (tempo map and Note Sequence,
 // see ZtripTimeline), which the graph's BeatClock and NoteLane nodes read.
@@ -62,6 +68,20 @@ public:
     void set_use_cache(bool use_cache) { use_cache_ = use_cache; }
     bool is_using_cache() const { return use_cache_; }
     String get_status() const;
+
+    void set_live_input(bool live);
+    bool is_live_input() const { return live_input_; }
+    void set_live_device(const String& device);
+    String get_live_device() const { return live_device_; }
+    void set_live_loopback(bool loopback);
+    bool is_live_loopback() const { return live_loopback_; }
+    void set_live_simulate_file(const String& path);
+    String get_live_simulate_file() const { return live_simulate_file_; }
+    void set_live_gain_db(double gain);
+    double get_live_gain_db() const { return live_gain_db_; }
+    bool is_live_running() const { return live_ != nullptr; }
+    // Capture devices: an array of {name, default, loopback} dictionaries.
+    static Array get_live_devices();
 
     void play(double from = -1.0);
     void stop();
@@ -121,6 +141,11 @@ private:
     void set_status_changed();
     void bind_timeline();
     void on_timeline_changed();
+    void start_live();
+    void stop_live();
+    void restart_live();
+    void rebuild_evaluator();
+    const ztrip::analysis::AnalysisResult* main_source() const;
 
     NodePath audio_player_;
     String audio_file_;
@@ -158,6 +183,14 @@ private:
     uint64_t graph_mtime_ = 0;
     double graph_poll_ = 0.0;
     bool applied_ = false; // targets have been written since the last restore
+
+    bool live_input_ = false;
+    String live_device_;
+    bool live_loopback_ = false;
+    String live_simulate_file_;
+    double live_gain_db_ = 0.0;
+    std::unique_ptr<ztrip::io::LiveAudioInput> live_;
+    String live_error_;
 };
 
 } // namespace godot

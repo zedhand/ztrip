@@ -12,6 +12,7 @@ If something here does not match what you see, that is worth reporting too (see 
 | Motion Graph core | Works from C++ only | [Motion Graphs](#motion-graphs) |
 | Godot addon | Ready for testing | [Godot addon](#godot-addon) |
 | Timeline, tempo map and note lanes | Ready for testing | [Timeline](#timeline) |
+| Live audio (microphone, loopback) | Early, for trying out | [Live audio](#live-audio) |
 
 Supported platforms for the beta are Windows 11 and Linux. macOS is not supported yet.
 
@@ -189,6 +190,15 @@ Select the `ZtripPlayer` and open **Timeline**. From the top down it shows bar n
 
 What to look for on a song with a clear beat: Kick notes sit on the kick drum (the Kick draft is tested to land within 20 ms of the real hits). Snare and Hats drafts are rougher, because they come from the Mid and Air bands, which guitars, vocals and cymbals also hit; expect to delete some.
 
+## Live audio
+
+ztrip can also react to sound as it happens: a microphone, or whatever the computer is playing (loopback).
+
+- **Check your input first:** `live-cli --list` lists inputs (loopback sources are marked). `live-cli` alone listens to the default microphone and prints the six band levels (0-9) ten times a second, plus a line of onsets when something hits; `live-cli --loopback` listens to what the computer plays. `live-cli --file song.wav` plays a WAV into it in real time if you have no microphone, and `--graph examples/kick_to_light.mgraph.json` prints the graph's outputs too.
+- **In Godot:** on the ZtripPlayer, turn on **Live input**, pick a device (empty means the default microphone) or tick **Live loopback**, then press **Playing**. The same graph that ran on a song now runs on the input.
+
+What to look for: clap or play music near the microphone and the Sub/Bass onsets should tick on kicks, with the light flashing on them. Live analysis adds about 15 ms; the sound card's buffer comes on top.
+
 ## Known limitations
 
 - Input must be WAV; convert other formats first. In Godot, WAVs must be plain PCM (see [Godot addon](#godot-addon)).
@@ -196,7 +206,7 @@ What to look for on a song with a clear beat: Kick notes sit on the kick drum (t
 - Snare and Hats lanes are drafted from plain band onsets and need cleaning up on busy mixes.
 - Tempo changes can't be drawn in the Timeline yet (only nudged and scaled); edit the `.tempo.json` for that.
 - The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick. The Timeline's Kick lane uses the dedicated kick detector instead.
-- No live input yet (microphone, MIDI, OSC, DMX). That comes after the beta.
+- Live audio has no beat grid or dedicated kick detector yet: `BeatClock` runs at a fixed `bpm`, and kicks come from Sub-band onsets. MIDI, OSC and DMX input are still to come.
 
 ## Reporting problems
 

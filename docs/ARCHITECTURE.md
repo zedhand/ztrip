@@ -142,6 +142,8 @@ Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of
 4. **Result:** an `AnalysisResult` with the offline names, growing as audio arrives, so a graph moves from a file to live input by binding the live result to the slot and setting `EvaluatorSettings::live`. Values and events are stamped on the stream's sample clock when they become known, and `time()` is the latest analysed frame, so a host evaluates at `time()` and never misses an event. `kick`, `beat` and `downbeat` exist but are empty for now (BeatClock falls back to its `bpm` param).
 5. **Threads:** the analyser is not thread safe. A capture thread hands samples over through `io::SpscRing` (lock free, drops and counts what doesn't fit), and the evaluating thread drains it into `push`, with `push_silence` for dropped samples so the clock stays on the device's.
 
+6. **Capture:** `io::AudioCapture` opens a microphone or loopback source with miniaudio (backends are loaded at run time, so builds need no audio SDK) and writes the mono mix (or one channel) into an SPSC ring from the device thread. `io::LiveAudioInput` pairs a capture (or a WAV played in real time, for trying setups without a device) with a `LiveAnalyzer`; `update()` drains the ring. `live-cli` prints live levels and onsets, and the Godot player's `live_input` binds a live input to `main`.
+
 On reference track 01, live `onset.Sub` (velocity 0.3 or more) finds 99% of the kicks with 100% precision, 12 ms late on average and 15 ms at worst; `onset.Air` finds every hat within 18 ms.
 
 ## Persisted formats

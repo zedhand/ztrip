@@ -5,7 +5,8 @@ extends SceneTree
 ## Synthesises a 120 BPM kick track, plays it through a graph into a light, a
 ## shader uniform and a camera, and checks the values, seeking, macros,
 ## hot reload and write-back, then drafts and edits the song's timeline
-## through the Timeline panel. Exits with the number of failed checks.
+## through the Timeline panel, and plays the kick track in as simulated live
+## input. Exits with the number of failed checks.
 
 const RATE := 48000
 const BPM := 120.0
@@ -15,6 +16,7 @@ const GRAPH := "user://ztrip_test.mgraph.json"
 const LANE_GRAPH := "user://ztrip_test_lanes.mgraph.json"
 const TEMPO := "user://ztrip_test.tempo.json"
 const SEQUENCE := "user://ztrip_test.nseq.json"
+const LIVE_GRAPH := "user://ztrip_test_live.mgraph.json"
 
 var _failures := 0
 var _checks := 0
@@ -168,6 +170,52 @@ func _run() -> void:
 
 	await _test_graph_panel()
 	await _test_timeline()
+	await _test_live()
+
+
+# Live input: the kick track played in real time as if from a microphone.
+func _test_live() -> void:
+	_write_graph(LIVE_GRAPH, 4.0, "Lights/Key:light_energy")
+	var devices: Array = ZtripPlayer.get_live_devices()
+	_check(devices is Array, "capture devices can be listed (%d found)" % devices.size())
+
+	var scene := Node3D.new()
+	var lights := Node3D.new()
+	lights.name = "Lights"
+	scene.add_child(lights)
+	var light := OmniLight3D.new()
+	light.name = "Key"
+	light.light_energy = 0.7
+	lights.add_child(light)
+	var player: Node = ClassDB.instantiate("ZtripPlayer")
+	player.graph_file = LIVE_GRAPH
+	player.live_input = true
+	player.live_simulate_file = WAV
+	scene.add_child(player)
+	root.add_child(scene)
+	await process_frame
+	_check(not player.is_live_running(), "live capture waits for play")
+
+	player.play()
+	_check(player.is_live_running(), "play starts live input: " + player.get_status())
+	# Watch the light for 2.6 s of real time: kicks come every 0.5 s.
+	var flashes := 0
+	var lit := false
+	var brightest := 0.0
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 2600:
+		await process_frame
+		var now: bool = light.light_energy > 1.5
+		if now and not lit:
+			flashes += 1
+		lit = now
+		brightest = maxf(brightest, light.light_energy)
+	var t: float = player.time
+	_check(t > 2.0 and t < 3.0, "live time follows the input's clock (%.2f s after 2.6 s)" % t)
+	_check(flashes >= 4 and flashes <= 6, "the light flashes on live kicks (%d flashes, peak %.2f)" % [flashes, brightest])
+	player.stop()
+	_check(not player.is_live_running(), "stop ends live input")
+	scene.free()
 
 
 # The editor's Motion Graph panel: load, edit, check and save a graph.
