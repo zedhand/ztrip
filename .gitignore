@@ -1,7 +1,103 @@
+# Build output
 /build*/
 /out/
+/install*/
+/_deps/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+compile_commands.json
+CMakeUserPresets.json
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exp
+*.pdb
+*.ilk
+*.exe
+*.zip
+*.tar.gz
+
+# Godot: caches, imports and exports (the addon's built binaries are ignored
+# in hosts/godot/project/addons/ztrip/bin/.gitignore)
+.godot/
+.import/
+*.import
+export_presets.cfg
+*.translation
+mono_crash.*.json
+
+# Audio and video: never committed. Reference tracks live outside the repo
+# (docs/DECISIONS.md entry 11), and songs for the demo go in
+# hosts/godot/project/music/, which is ignored too.
+*.wav
+*.wave
+*.mp3
+*.ogg
+*.oga
+*.opus
+*.flac
+*.aif
+*.aiff
+*.m4a
+*.aac
+*.wma
+*.mid
+*.midi
+*.mp4
+*.mov
+*.mkv
+*.webm
+
+# Analysis output (analyze-cli writes these next to the song)
+*.sigcache
+*-analysis/
+
+# Local environment and secrets
+.env
+.env.*
+*.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# IDEs and editors
 .vs/
 .vscode/
 .idea/
-compile_commands.json
-CMakeUserPresets.json
+.cache/
+.clangd/
+*.code-workspace
+*.sln
+*.vcxproj*
+*.user
+*.suo
+*.swp
+*.swo
+*~
+\#*\#
+.#*
+
+# OS junk
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Python (plot scripts)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
