@@ -28,8 +28,10 @@ add_executable(ztrip_tests
   test_autodraft.cpp
   test_nseq.cpp
   test_graph_timeline.cpp
+  test_live.cpp
 )
-target_link_libraries(ztrip_tests PRIVATE ztrip::core Catch2::Catch2WithMain)
+find_package(Threads REQUIRED)
+target_link_libraries(ztrip_tests PRIVATE ztrip::core Catch2::Catch2WithMain Threads::Threads)
 target_compile_definitions(ztrip_tests PRIVATE ZTRIP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 ztrip_set_warnings(ztrip_tests)
 
