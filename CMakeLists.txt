@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(mre
+project(ztrip
   VERSION 0.1.0
   DESCRIPTION "Music-reactive animation engine"
   LANGUAGES CXX)
@@ -10,19 +10,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(MRE_BUILD_TOOLS "Build command-line tools" ON)
-option(MRE_BUILD_TESTS "Build unit tests" ON)
+option(ZTRIP_BUILD_TOOLS "Build command-line tools" ON)
+option(ZTRIP_BUILD_TESTS "Build unit tests" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(MreWarnings)
+include(ZtripWarnings)
 
 add_subdirectory(core)
 
-if(MRE_BUILD_TOOLS)
+if(ZTRIP_BUILD_TOOLS)
   add_subdirectory(tools/analyze-cli)
 endif()
 
-if(MRE_BUILD_TESTS)
+if(ZTRIP_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()

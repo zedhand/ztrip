@@ -1,9 +1,9 @@
-#include "mre/version.hpp"
+#include "ztrip/version.hpp"
 
-namespace mre {
+namespace ztrip {
 
 std::string_view version() noexcept {
-    return MRE_VERSION_STRING;
+    return ZTRIP_VERSION_STRING;
 }
 
-} // namespace mre
+} // namespace ztrip
