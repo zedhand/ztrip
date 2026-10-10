@@ -1,6 +1,6 @@
 # Getting started (beta)
 
-This guide is for beta testers. It walks you through building ztrip, running the analyser on a song of your own, and reading what it found. The Godot editor addon and the timeline are still being built; their sections below are placeholders and will be filled in as they land.
+This guide is for beta testers. It walks you through building ztrip, running the analyser on a song of your own, and reading what it found. Then it shows the addon in Godot and the timeline where you fix what the analyser got wrong.
 
 If something here does not match what you see, that is worth reporting too (see [Reporting problems](#reporting-problems)).
 
@@ -10,8 +10,8 @@ If something here does not match what you see, that is worth reporting too (see 
 | --- | --- | --- |
 | Audio analysis (`analyze-cli`) | Ready for testing | [Analyse a song](#analyse-a-song) |
 | Motion Graph core | Works from C++ only | [Motion Graphs](#motion-graphs) |
-| Godot addon | In progress | [Godot addon](#godot-addon-coming-soon) |
-| Timeline, tempo map and note lanes | In progress | [Timeline](#timeline-coming-soon) |
+| Godot addon | Ready for testing | [Godot addon](#godot-addon) |
+| Timeline, tempo map and note lanes | Ready for testing | [Timeline](#timeline) |
 
 Supported platforms for the beta are Windows 11 and Linux. macOS is not supported yet.
 
@@ -153,34 +153,51 @@ Changing any option recomputes the analysis automatically.
 
 A Motion Graph is a small `.mgraph.json` file that turns signals into property values, for example "on each kick, flash the key light and let it fade over 150 ms". [`examples/kick_to_light.mgraph.json`](../examples/kick_to_light.mgraph.json) is exactly that, and [`examples/kitchen_sink.mgraph.json`](../examples/kitchen_sink.mgraph.json) uses every node type. [NODES.md](NODES.md) lists the nodes and their settings.
 
-For the beta, graphs only run from C++ (see the README). The Godot addon will load and edit them; until then, you can read the examples to get a feel for the format.
+Graphs run in the Godot addon (below), which also has a panel for editing them, or from C++ (see the README).
 
-## Godot addon (coming soon)
+## Godot addon
 
-> **Placeholder.** The Godot 4 host is being built now and this section will be written when it lands.
+You need [Godot 4.5 or newer](https://godotengine.org/download) (the standard build, not .NET) and the build tools from [Build from source](#build-from-source).
 
-What it will cover:
+1. Build the addon from the ztrip folder (the first build takes several minutes):
 
-- Which Godot 4 version to use and how to install the addon into a project.
-- Adding a song and analysing it from inside the editor.
-- Opening a Motion Graph in the graph editor and binding its outputs to lights, materials and the camera.
-- Playing and scrubbing the song in the editor, outside Play mode.
+   ```sh
+   cmake --preset godot
+   cmake --build --preset godot
+   ```
 
-## Timeline (coming soon)
+2. In Godot's Project Manager, choose **Import** and open `hosts/godot/project/project.godot`.
+3. Copy a WAV into the project's `music/` folder (it shows up in the FileSystem dock). If Godot reports "Format not supported for WAVE file", re-save it as 16-bit PCM: `ffmpeg -i song.wav -c:a pcm_s16le song16.wav`.
+4. Open `demo/stage.tscn`, select the `Music` node and drag your WAV onto its **Stream** in the inspector.
+5. Select the `ZtripPlayer` node. After a second or two its **Status** shows the song's length and tempo.
+6. Drag **Time** to scrub, or tick **Playing** to hear the song while the scene reacts, without pressing Play. Press F5 to run the stage full screen with its beat counter.
 
-> **Placeholder.** Musical time (tempo map, note lanes and the timeline dock) is being built now and this section will be written when it lands.
+What to look for: the red light flashes with the kick drum, the blue spotlight with the snare, the white light with hi-hats (each from a note lane the addon drafts from the song, see [Timeline](#timeline)), the orb glows with the bass and flashes on every beat, and the camera pushes in at the start of each bar. If the song has a part without drums, those lights go dark there.
 
-What it will cover:
+The **Motion Graph** panel at the bottom of the editor shows the graph that does this, with each output's live value. Change a number (for example `kick_flash`'s `decay_ms`) and **Save**: the scene picks it up straight away. The sliders under **Macros** in the `ZtripPlayer` inspector are quick controls for the same graph. [hosts/godot/README.md](../hosts/godot/README.md) explains how to point a graph at your own lights, materials and cameras.
 
-- The bars-and-beats timeline, and setting or nudging the tempo and first downbeat.
-- Note lanes: drawing notes, and auto-drafting a kick lane from the song.
-- Driving a graph from a note lane instead of raw audio.
+## Timeline
+
+When a song is analysed, the `ZtripPlayer` drafts its timeline: a tempo map that follows the detected beats (so a live band's drifting tempo is followed bar by bar), and three note lanes, **Kick**, **Snare** and **Hats**, with a note on each detected hit, snapped to the 1/16 grid. The demo stage's lights play those notes. The draft is a starting point; the **Timeline** panel at the bottom of the editor is where you fix it.
+
+Select the `ZtripPlayer` and open **Timeline**. From the top down it shows bar numbers, the tempo (the orange line, with the BPM at each change and the meter), the song's loudness, then one row per lane. The faint lines in a lane are every hit the analyser found, including the ones the draft left out.
+
+1. **Line the grid up with the song.** Press **Play** (or Space) and watch the bar lines against the loudness peaks, and the red light against the kick you hear. If everything is a little early or late, use **Nudge** (1 ms or 10 ms steps) until it sits. If it drifts apart over the song, use **Tempo -/+** (0.1 % steps).
+2. **Fix the notes.** Click an empty spot in a lane to add a note, drag a note to move it, drag its right edge to make it longer, right-click it to delete it. Notes snap to the **Grid** (hold Alt to place freely). With notes selected (Shift+click for several, Ctrl+A for all): Left/Right moves them a grid step (Shift: a quarter step), Up/Down changes how hard they hit, Q snaps them to the grid, Delete removes them. Ctrl+Z undoes.
+3. **Listen.** The scene follows every edit straight away. Click the bar numbers to jump somewhere.
+4. **Save.** **Save** writes `<song>.tempo.json` and `<song>.nseq.json` next to the song and points the player at them; save the scene too. From then on the player loads your edits instead of drafting. **Re-draft** throws the edits away and drafts again (Ctrl+Z gets them back).
+
+**+ Lane** adds an empty lane (right-click a lane's name to clear or remove it). To drive something from a lane, add a **NoteLane** node to the Motion Graph with its `lane` set to the lane's name: its `trigger` output fires on each note (with the note's velocity), `gate` is on while a note is held, and `envelope` follows the note's envelope.
+
+What to look for on a song with a clear beat: Kick notes sit on the kick drum (the Kick draft is tested to land within 20 ms of the real hits). Snare and Hats drafts are rougher, because they come from the Mid and Air bands, which guitars, vocals and cymbals also hit; expect to delete some.
 
 ## Known limitations
 
-- Input must be WAV; convert other formats first.
-- Songs played live (not to a click) can drift in tempo. The beat grid is a single fixed tempo for now, so it can slide onto the off-beat in places. The tempo map in the timeline will fix this.
-- The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick. Use the `kick` events for kicks.
+- Input must be WAV; convert other formats first. In Godot, WAVs must be plain PCM (see [Godot addon](#godot-addon)).
+- Songs played live (not to a click) can drift in tempo. The drafted tempo map follows the detected beats, but where the beat tracker slipped onto the off-beat the grid does too; nudge or re-draw those notes in the Timeline.
+- Snare and Hats lanes are drafted from plain band onsets and need cleaning up on busy mixes.
+- Tempo changes can't be drawn in the Timeline yet (only nudged and scaled); edit the `.tempo.json` for that.
+- The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick. The Timeline's Kick lane uses the dedicated kick detector instead.
 - Kicks more than 5 dB quieter than the loudest ones are skipped (soft ghost notes, or a quiet intro before a loud song). `--kick-gate 8` keeps more of them.
 - Drum and bass reads at half tempo (85 instead of 170 BPM). Use `--bpm-prior 170`.
 - No live input yet (microphone, MIDI, OSC, DMX). That comes after the beta.
