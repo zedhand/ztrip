@@ -45,7 +45,10 @@ TEST_CASE("a song played into the live input drives a live graph", "[live][captu
 
     GraphBuilder g;
     g.node("onset", "AudioOnset", {{"band", std::string("Bass")}, {"min_velocity", 0.3}});
-    g.node("decay", "ImpulseDecay", {{"decay_ms", 100.0}});
+    // A long decay keeps each flash above 0.5 across a slow frame: Windows
+    // sleeps round up to its ~15.6 ms timer, so detection latency plus one
+    // frame can pass the ~70 ms a 100 ms decay stays lit for.
+    g.node("decay", "ImpulseDecay", {{"decay_ms", 250.0}});
     g.edge("onset.trigger", "decay.trigger").out("light", "decay.out");
     graph::EvaluatorSettings settings;
     settings.live = true;
