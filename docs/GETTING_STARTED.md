@@ -165,7 +165,7 @@ You need [Godot 4.5 or newer](https://godotengine.org/download) (the standard bu
    ```
 
 2. In Godot's Project Manager, choose **Import** and open `hosts/godot/project/project.godot`.
-3. Copy a WAV into the project's `music/` folder (it shows up in the FileSystem dock). If Godot reports "Format not supported for WAVE file", re-save it as 16-bit PCM: `ffmpeg -i song.wav -c:a pcm_s16le song16.wav`.
+3. Copy a WAV into the project's `music/` folder (it shows up in the FileSystem dock). Godot can't import the 24-bit and float WAVs many tools save, so for those you see a "Format not supported for WAVE file" error followed straight away by "ztrip: rewrote the header of ...": the addon has rewritten the file's header (the audio itself is unchanged) and Godot imports it again.
 4. Open `demo/stage.tscn`, select the `Music` node and drag your WAV onto its **Stream** in the inspector.
 5. Select the `ZtripPlayer` node. After a second or two its **Status** shows the song's length and tempo.
 6. Drag **Time** to scrub, or tick **Playing** to hear the song while the scene reacts, without pressing Play. Press F5 to run the stage full screen with its beat counter.
@@ -191,7 +191,7 @@ What to look for on a song with a clear beat: Kick notes sit on the kick drum (t
 
 ## Known limitations
 
-- Input must be WAV; convert other formats first. In Godot, WAVs must be plain PCM (see [Godot addon](#godot-addon)).
+- Input must be WAV; convert other formats first.
 - Songs played live (not to a click) can drift in tempo. The drafted tempo map follows the detected beats, but where the beat tracker slipped onto the off-beat the grid does too; nudge or re-draw those notes in the Timeline.
 - Snare and Hats lanes are drafted from plain band onsets and need cleaning up on busy mixes.
 - Tempo changes can't be drawn in the Timeline yet (only nudged and scaled); edit the `.tempo.json` for that.
