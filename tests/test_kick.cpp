@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 using namespace ztrip::analysis;
 
@@ -101,7 +102,7 @@ TEST_CASE("a kick at the very start is found, silence finds nothing", "[kick]") 
     std::vector<float> x(sr * 2, 0.0f);
     CHECK(detect_kicks(x, sr, {}).empty());
     ztrip::test::add_kick(x, sr, 0.0);
-    ztrip::test::add_kick(x, sr, 1.0, 0.4f);
+    ztrip::test::add_kick(x, sr, 1.0, 0.6f);
     const auto k = detect_kicks(x, sr, {});
     REQUIRE(k.size() == 2);
     CHECK(k[0].time < 0.005);
@@ -115,7 +116,55 @@ TEST_CASE("quiet low rumbles under the gate are ignored", "[kick]") {
     std::vector<float> x(sr * 3, 0.0f);
     ztrip::test::add_kick(x, sr, 0.5, 0.9f);
     ztrip::test::add_kick(x, sr, 1.5, 0.9f);
-    ztrip::test::add_kick(x, sr, 2.5, 0.02f); // -33 dB, below the 20 dB gate
+    ztrip::test::add_kick(x, sr, 2.5, 0.3f); // -9.5 dB, below the 5 dB gate
     const auto k = detect_kicks(x, sr, {});
     CHECK(k.size() == 2);
+}
+
+TEST_CASE("a kick over a sustained, sidechained sub is found and the swell is not", "[kick]") {
+    // EDM: the sub bass ducks under each kick and swells back. In dB the kick
+    // barely rises over the full-level sub; in amplitude it jumps clearly,
+    // while the swell rises slowly.
+    constexpr int sr = 48000;
+    constexpr double spb = 60.0 / 128.0;
+    constexpr int beats = 32;
+    std::vector<float> x(static_cast<std::size_t>((beats * spb + 1.0) * sr), 0.0f);
+    std::vector<double> kicks;
+    for (int b = 0; b < beats; ++b) kicks.push_back(b * spb);
+    for (std::size_t i = 0; i < x.size(); ++i) {
+        const double t = static_cast<double>(i) / sr;
+        const double since = t - std::floor(t / spb) * spb;
+        const double duck = 1.0 - 0.9 * std::exp(-(since / 0.13) * (since / 0.13));
+        x[i] = static_cast<float>(0.3 * duck * std::sin(2.0 * std::numbers::pi * 55.0 * t));
+    }
+    for (double t : kicks) ztrip::test::add_kick(x, sr, t);
+    const Match m = match(detect_kicks(x, sr, {}), kicks, 0.020);
+    INFO("R=" << m.recall << " P=" << m.precision << " max err=" << m.max_error);
+    CHECK(m.recall == 1.0);
+    CHECK(m.precision == 1.0);
+    CHECK(m.max_error < 0.008);
+}
+
+TEST_CASE("a fast double kick keeps every hit", "[kick]") {
+    // Metal: 16th-note double kick at 190 BPM, 79 ms apart, with a tight
+    // kick that has mostly died away before the next hit.
+    constexpr int sr = 44100;
+    constexpr double step = 60.0 / 190.0 / 4.0;
+    std::vector<float> x(static_cast<std::size_t>(5.0 * sr), 0.0f);
+    std::vector<double> kicks;
+    for (int i = 0; i < 48; ++i) {
+        const double t0 = 0.2 + i * step;
+        kicks.push_back(t0);
+        const auto start = static_cast<std::size_t>(std::lround(t0 * sr));
+        double phase = 0.0;
+        for (std::size_t j = 0; j < static_cast<std::size_t>(0.2 * sr) && start + j < x.size(); ++j) {
+            const double s = static_cast<double>(j) / sr;
+            phase += 2.0 * std::numbers::pi * (55.0 + 140.0 * std::exp(-s / 0.015)) / sr;
+            x[start + j] += 0.8f * static_cast<float>(std::sin(phase) * std::exp(-s / 0.03));
+        }
+    }
+    const Match m = match(detect_kicks(x, sr, {}), kicks, 0.020);
+    INFO("R=" << m.recall << " P=" << m.precision << " max err=" << m.max_error);
+    CHECK(m.recall == 1.0);
+    CHECK(m.precision == 1.0);
 }

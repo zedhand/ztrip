@@ -92,12 +92,13 @@ onset.Sub        131
 onset.Bass       195
 ...
 kick             112
+snare            49
 tempo map song-analysis/song.tempo.json (1 segments)
 lane      Kick: 112 notes -> song-analysis/song.nseq.json
 plots     python3 song-analysis/plot.py
 ```
 
-The first thing to check is the **tempo** line. If you know the song's BPM, compare. Getting half or double the real tempo (64 or 256 instead of 128) is a known failure mode worth reporting. The `kick` line counts the kick drum hits it found.
+The first thing to check is the **tempo** line. If you know the song's BPM, compare. Getting half or double the real tempo (64 or 256 instead of 128) is a known failure mode worth reporting. The `kick` and `snare` lines count the drum hits it found.
 
 ### 3. Look at the result
 
@@ -107,7 +108,7 @@ The output folder holds:
 | --- | --- |
 | `<name>.sigcache` | The analysis in ztrip's binary format. Re-running with the same song and settings reuses it instead of recomputing. |
 | `signals.csv` | 120 values per second for each band level (`band.Sub` ... `band.Air`), its smoothed envelope (`env.*`), overall loudness (`rms`) and brightness (`centroid`). All are 0 to 1. |
-| `events.csv` | Every detected onset per band, plus each beat and downbeat, with a time in seconds and a strength from 0 to 1. |
+| `events.csv` | Every detected onset per band, kick and snare, plus each beat and downbeat, with a time in seconds and a strength from 0 to 1. |
 | `beats.csv` | The beat grid: time, bar number, beat number in the bar, and whether it is a downbeat. |
 | `<name>.tempo.json` | The tempo map: the song's tempo, bar by bar, fitted to the detected beats. |
 | `<name>.nseq.json` | A Note Sequence with a Kick lane: one note per detected kick, snapped to a 1/16 grid. |
@@ -120,7 +121,7 @@ To see it as a picture, install Python 3 with numpy and matplotlib once. On Ubun
 python3 song-analysis/plot.py --start 30 --end 45
 ```
 
-That writes `song-analysis/analysis.png` for 30 s to 45 s of the song. There is one row per band, from Sub (deep bass, 20-60 Hz) up to Air (cymbal shimmer, 6-20 kHz), and a bottom row with loudness and the beat grid. In each band row, the light fill is the level, the dark line is the envelope, and red ticks are detected hits. Orange triangles along the top of the Sub row are the kicks. Dashed grey lines mark the start of each bar.
+That writes `song-analysis/analysis.png` for 30 s to 45 s of the song. There is one row per band, from Sub (deep bass, 20-60 Hz) up to Air (cymbal shimmer, 6-20 kHz), and a bottom row with loudness and the beat grid. In each band row, the light fill is the level, the dark line is the envelope, and red ticks are detected hits. Orange triangles along the top of the Sub row are the kicks, and green triangles along the top of the Mid row are the snares. Dashed grey lines mark the start of each bar.
 
 Quick checks that need no musical training:
 
@@ -139,7 +140,8 @@ Run `analyze-cli --help` for the full list. The ones most worth trying:
 | `--bpm-prior BPM` | 120 | The tempo comes out at half or double the real one. Set this near the real BPM. |
 | `--sensitivity X` | 1.5 | Too many red ticks: raise it. Hits are missed: lower it. |
 | `--min-gap MS` | 50 | Fast rolls are merged into one hit: lower it. |
-| `--kick-rise DB` | 12 | Clicks with no kick under them: raise it. Kicks are missed: lower it. |
+| `--kick-jump X` | 0.4 | Clicks with no kick under them: raise it (0.5). Kicks are missed: lower it (0.3). |
+| `--kick-gate DB` | 5 | Quieter kicks are missed: raise it (8). Bass notes count as kicks: lower it. |
 | `--nudge MS` | 0 | Every click is early or late by the same amount: shift them (positive is later). |
 | `--release MS` | 150 | Envelopes fall too slowly (lights would linger): lower it. |
 | `--beats-per-bar N` | 4 | Songs in 3/4 or 6/8. |
@@ -178,7 +180,9 @@ What it will cover:
 
 - Input must be WAV; convert other formats first.
 - Songs played live (not to a click) can drift in tempo. The beat grid is a single fixed tempo for now, so it can slide onto the off-beat in places. The tempo map in the timeline will fix this.
-- The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick.
+- The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick. Use the `kick` events for kicks.
+- Kicks more than 5 dB quieter than the loudest ones are skipped (soft ghost notes, or a quiet intro before a loud song). `--kick-gate 8` keeps more of them.
+- Drum and bass reads at half tempo (85 instead of 170 BPM). Use `--bpm-prior 170`.
 - No live input yet (microphone, MIDI, OSC, DMX). That comes after the beta.
 
 ## Reporting problems
