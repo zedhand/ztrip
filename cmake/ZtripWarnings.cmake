@@ -1,5 +1,5 @@
-# Shared warning flags for mre targets.
-function(mre_set_warnings target)
+# Shared warning flags for ztrip targets.
+function(ztrip_set_warnings target)
   if(MSVC)
     target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
   else()

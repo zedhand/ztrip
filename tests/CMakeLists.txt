@@ -8,11 +8,11 @@ FetchContent_Declare(Catch2
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(mre_tests
+add_executable(ztrip_tests
   test_smoke.cpp
 )
-target_link_libraries(mre_tests PRIVATE mre::core Catch2::Catch2WithMain)
-mre_set_warnings(mre_tests)
+target_link_libraries(ztrip_tests PRIVATE ztrip::core Catch2::Catch2WithMain)
+ztrip_set_warnings(ztrip_tests)
 
 include(Catch)
-catch_discover_tests(mre_tests)
+catch_discover_tests(ztrip_tests)
