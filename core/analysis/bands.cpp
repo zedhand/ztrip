@@ -6,22 +6,8 @@
 namespace ztrip::analysis {
 namespace {
 
-struct BinRange {
-    std::size_t first = 0;
-    std::size_t last = 0; // exclusive
-};
-
 BinRange bins_for(const Spectrogram& spec, const Band& band) {
-    const double per_bin = static_cast<double>(spec.sample_rate) / spec.fft_size;
-    auto to_bin = [&](float hz) {
-        const double b = std::ceil(hz / per_bin);
-        return static_cast<std::size_t>(std::clamp(b, 0.0, static_cast<double>(spec.bins)));
-    };
-    BinRange r{to_bin(band.low_hz), to_bin(band.high_hz)};
-    // Narrow low bands at small FFT sizes can fall between bins; keep one.
-    if (r.last <= r.first) r.last = std::min(r.first + 1, spec.bins);
-    if (r.first >= spec.bins) r.first = r.last = spec.bins;
-    return r;
+    return band_bins(spec.sample_rate, spec.fft_size, band);
 }
 
 // Log compression for flux; gamma sets how strongly quiet partials count.
@@ -37,45 +23,78 @@ std::vector<Band> default_bands() {
     };
 }
 
+BinRange band_bins(int sample_rate, int fft_size, const Band& band) {
+    const std::size_t bins = static_cast<std::size_t>(fft_size) / 2 + 1;
+    const double per_bin = static_cast<double>(sample_rate) / fft_size;
+    auto to_bin = [&](float hz) {
+        const double b = std::ceil(hz / per_bin);
+        return static_cast<std::size_t>(std::clamp(b, 0.0, static_cast<double>(bins)));
+    };
+    BinRange r{to_bin(band.low_hz), to_bin(band.high_hz)};
+    // Narrow low bands at small FFT sizes can fall between bins; keep one.
+    if (r.last <= r.first) r.last = std::min(r.first + 1, bins);
+    if (r.first >= bins) r.first = r.last = bins;
+    return r;
+}
+
+float frame_energy_db(std::span<const float> frame, BinRange r) {
+    double power = 0.0;
+    for (std::size_t k = r.first; k < r.last; ++k) {
+        power += static_cast<double>(frame[k]) * frame[k];
+    }
+    return static_cast<float>(10.0 * std::log10(power + 1e-12));
+}
+
+float frame_centroid_hz(std::span<const float> frame, int sample_rate, int fft_size) {
+    double num = 0.0;
+    double den = 0.0;
+    for (std::size_t k = 1; k < frame.size(); ++k) {
+        num += static_cast<double>(k) * sample_rate / fft_size * frame[k];
+        den += frame[k];
+    }
+    return den > 1e-9 ? static_cast<float>(num / den) : 0.0f;
+}
+
+// Compares against the previous frame max-filtered over +-1 bin (SuperFlux,
+// Boeck & Widmer 2013), which suppresses leakage and vibrato false onsets.
+BandFlux::BandFlux(BinRange bins, std::size_t total_bins)
+    : r_(bins), lo_(bins.first > 0 ? bins.first - 1 : 0), hi_(std::min(total_bins, bins.last + 1)) {
+    if (hi_ < lo_) hi_ = lo_;
+    cur_.assign(hi_ - lo_, 0.0f);
+    prev_.assign(hi_ - lo_, 0.0f);
+}
+
+void BandFlux::reset() {
+    std::fill(prev_.begin(), prev_.end(), 0.0f);
+}
+
+float BandFlux::next(std::span<const float> frame) {
+    if (r_.first >= r_.last) return 0.0f;
+    for (std::size_t k = lo_; k < hi_; ++k) cur_[k - lo_] = std::log1p(kFluxGamma * frame[k]);
+    float sum = 0.0f;
+    for (std::size_t k = r_.first; k < r_.last; ++k) {
+        const std::size_t i = k - lo_;
+        float ref = prev_[i];
+        if (i > 0) ref = std::max(ref, prev_[i - 1]);
+        if (i + 1 < prev_.size()) ref = std::max(ref, prev_[i + 1]);
+        const float d = cur_[i] - ref;
+        if (d > 0.0f) sum += d;
+    }
+    std::swap(cur_, prev_);
+    return sum / static_cast<float>(r_.last - r_.first);
+}
+
 std::vector<float> band_energy_db(const Spectrogram& spec, const Band& band) {
     const BinRange r = bins_for(spec, band);
     std::vector<float> out(spec.frames);
-    for (std::size_t f = 0; f < spec.frames; ++f) {
-        const auto frame = spec.frame(f);
-        double power = 0.0;
-        for (std::size_t k = r.first; k < r.last; ++k) {
-            power += static_cast<double>(frame[k]) * frame[k];
-        }
-        out[f] = static_cast<float>(10.0 * std::log10(power + 1e-12));
-    }
+    for (std::size_t f = 0; f < spec.frames; ++f) out[f] = frame_energy_db(spec.frame(f), r);
     return out;
 }
 
 std::vector<float> band_flux(const Spectrogram& spec, const Band& band) {
-    const BinRange r = bins_for(spec, band);
+    BandFlux flux(bins_for(spec, band), spec.bins);
     std::vector<float> out(spec.frames, 0.0f);
-    if (r.first >= r.last) return out;
-    // Compare against the previous frame max-filtered over +-1 bin (SuperFlux,
-    // Boeck & Widmer 2013), which suppresses leakage and vibrato false onsets.
-    const std::size_t lo = r.first > 0 ? r.first - 1 : 0;
-    const std::size_t hi = std::min(spec.bins, r.last + 1);
-    std::vector<float> cur(hi - lo, 0.0f);
-    std::vector<float> prev(hi - lo, 0.0f);
-    for (std::size_t f = 0; f < spec.frames; ++f) {
-        const auto frame = spec.frame(f);
-        for (std::size_t k = lo; k < hi; ++k) cur[k - lo] = std::log1p(kFluxGamma * frame[k]);
-        float sum = 0.0f;
-        for (std::size_t k = r.first; k < r.last; ++k) {
-            const std::size_t i = k - lo;
-            float ref = prev[i];
-            if (i > 0) ref = std::max(ref, prev[i - 1]);
-            if (i + 1 < prev.size()) ref = std::max(ref, prev[i + 1]);
-            const float d = cur[i] - ref;
-            if (d > 0.0f) sum += d;
-        }
-        out[f] = sum / static_cast<float>(r.last - r.first);
-        std::swap(cur, prev);
-    }
+    for (std::size_t f = 0; f < spec.frames; ++f) out[f] = flux.next(spec.frame(f));
     return out;
 }
 
@@ -107,14 +126,7 @@ std::vector<float> normalize_percentile(std::span<const float> values, float lo_
 std::vector<float> spectral_centroid(const Spectrogram& spec) {
     std::vector<float> out(spec.frames, 0.0f);
     for (std::size_t f = 0; f < spec.frames; ++f) {
-        const auto frame = spec.frame(f);
-        double num = 0.0;
-        double den = 0.0;
-        for (std::size_t k = 1; k < spec.bins; ++k) {
-            num += spec.bin_hz(k) * frame[k];
-            den += frame[k];
-        }
-        out[f] = den > 1e-9 ? static_cast<float>(num / den) : 0.0f;
+        out[f] = frame_centroid_hz(spec.frame(f), spec.sample_rate, spec.fft_size);
     }
     return out;
 }

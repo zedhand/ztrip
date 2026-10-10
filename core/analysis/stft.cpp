@@ -50,13 +50,58 @@ std::vector<float> make_window(Window window, int n) {
     return w;
 }
 
+struct FrameTransform::Impl {
+    std::unique_ptr<PFFFT_Setup, SetupFree> setup;
+    AlignedFloats in, out, work;
+    std::vector<float> window;
+    float scale = 1.0f;
+};
+
+FrameTransform::FrameTransform(int fft_size, Window window) : n_(fft_size) {
+    if (!is_power_of_two(n_) || n_ < 512 || n_ > 8192) {
+        throw std::invalid_argument("stft: fft_size must be a power of two in 512..8192");
+    }
+    const auto un = static_cast<std::size_t>(n_);
+    impl_ = std::make_unique<Impl>();
+    impl_->setup.reset(pffft_new_setup(n_, PFFFT_REAL));
+    if (!impl_->setup) throw std::runtime_error("stft: pffft setup failed");
+    impl_->in = aligned_floats(un);
+    impl_->out = aligned_floats(un);
+    impl_->work = aligned_floats(un);
+    impl_->window = make_window(window, n_);
+    double window_sum = 0.0;
+    for (float w : impl_->window) window_sum += w;
+    impl_->scale = static_cast<float>(2.0 / window_sum);
+}
+
+FrameTransform::~FrameTransform() = default;
+FrameTransform::FrameTransform(FrameTransform&&) noexcept = default;
+FrameTransform& FrameTransform::operator=(FrameTransform&&) noexcept = default;
+
+void FrameTransform::magnitude(std::span<const float> samples, std::span<float> mag) {
+    const auto un = static_cast<std::size_t>(n_);
+    const std::size_t bins = un / 2 + 1;
+    float* in = impl_->in.get();
+    for (std::size_t i = 0; i < un; ++i) {
+        in[i] = i < samples.size() ? samples[i] * impl_->window[i] : 0.0f;
+    }
+    pffft_transform_ordered(impl_->setup.get(), in, impl_->out.get(), impl_->work.get(), PFFFT_FORWARD);
+
+    // Ordered real output: [DC, Nyquist, re1, im1, re2, im2, ...].
+    const float* o = impl_->out.get();
+    const float scale = impl_->scale;
+    mag[0] = std::fabs(o[0]) * scale;
+    mag[bins - 1] = std::fabs(o[1]) * scale;
+    for (std::size_t k = 1; k < bins - 1; ++k) {
+        mag[k] = std::hypot(o[2 * k], o[2 * k + 1]) * scale;
+    }
+}
+
 Spectrogram compute_stft(std::span<const float> mono, int sample_rate,
                          const StftSettings& settings) {
     const int n = settings.fft_size;
     const int hop = settings.effective_hop();
-    if (!is_power_of_two(n) || n < 512 || n > 8192) {
-        throw std::invalid_argument("stft: fft_size must be a power of two in 512..8192");
-    }
+    FrameTransform transform(n, settings.window);
     if (hop <= 0 || hop > n) throw std::invalid_argument("stft: hop must be in 1..fft_size");
     if (sample_rate <= 0) throw std::invalid_argument("stft: invalid sample rate");
     if (mono.empty()) throw std::invalid_argument("stft: empty signal");
@@ -71,36 +116,16 @@ Spectrogram compute_stft(std::span<const float> mono, int sample_rate,
     spec.frames = mono.size() / uhop + 1;
     spec.magnitude.resize(spec.frames * spec.bins);
 
-    std::unique_ptr<PFFFT_Setup, SetupFree> setup(pffft_new_setup(n, PFFFT_REAL));
-    if (!setup) throw std::runtime_error("stft: pffft setup failed");
-    auto in = aligned_floats(un);
-    auto out = aligned_floats(un);
-    auto work = aligned_floats(un);
-    const std::vector<float> window = make_window(settings.window, n);
-    // Scale so a full-scale sine reads ~1.0 at its bin whatever the window or size.
-    double window_sum = 0.0;
-    for (float w : window) window_sum += w;
-    const auto scale = static_cast<float>(2.0 / window_sum);
-
+    std::vector<float> frame(un);
     const auto half = static_cast<std::ptrdiff_t>(un / 2);
     const auto len = static_cast<std::ptrdiff_t>(mono.size());
     for (std::size_t f = 0; f < spec.frames; ++f) {
         const std::ptrdiff_t start = static_cast<std::ptrdiff_t>(f * uhop) - half;
         for (std::size_t i = 0; i < un; ++i) {
             const std::ptrdiff_t s = start + static_cast<std::ptrdiff_t>(i);
-            const float x = (s >= 0 && s < len) ? mono[static_cast<std::size_t>(s)] : 0.0f;
-            in.get()[i] = x * window[i];
+            frame[i] = (s >= 0 && s < len) ? mono[static_cast<std::size_t>(s)] : 0.0f;
         }
-        pffft_transform_ordered(setup.get(), in.get(), out.get(), work.get(), PFFFT_FORWARD);
-
-        // Ordered real output: [DC, Nyquist, re1, im1, re2, im2, ...].
-        const float* o = out.get();
-        float* mag = spec.magnitude.data() + f * spec.bins;
-        mag[0] = std::fabs(o[0]) * scale;
-        mag[spec.bins - 1] = std::fabs(o[1]) * scale;
-        for (std::size_t k = 1; k < spec.bins - 1; ++k) {
-            mag[k] = std::hypot(o[2 * k], o[2 * k + 1]) * scale;
-        }
+        transform.magnitude(frame, std::span<float>(spec.magnitude.data() + f * spec.bins, spec.bins));
     }
     return spec;
 }

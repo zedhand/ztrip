@@ -14,6 +14,33 @@ struct Band {
     float high_hz = 0.0f;
 };
 
+// The FFT bins a band covers, [first, last).
+struct BinRange {
+    std::size_t first = 0;
+    std::size_t last = 0;
+};
+BinRange band_bins(int sample_rate, int fft_size, const Band& band);
+
+// Band energy of one magnitude frame in dB (power summed over the bins).
+float frame_energy_db(std::span<const float> magnitude, BinRange bins);
+
+// Spectral centroid of one magnitude frame in Hz (0 when silent).
+float frame_centroid_hz(std::span<const float> magnitude, int sample_rate, int fft_size);
+
+// Spectral flux of one band, a frame at a time (see band_flux). Keeps the
+// previous frame, so frames must arrive in order.
+class BandFlux {
+public:
+    BandFlux(BinRange bins, std::size_t total_bins);
+    float next(std::span<const float> magnitude);
+    void reset();
+
+private:
+    BinRange r_;
+    std::size_t lo_ = 0, hi_ = 0;
+    std::vector<float> cur_, prev_;
+};
+
 // Sub 20-60, Bass 60-250, LowMid 250-500, Mid 500-2k, HighMid 2k-6k, Air 6k-20k Hz.
 std::vector<Band> default_bands();
 

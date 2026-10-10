@@ -4,27 +4,29 @@
 
 namespace ztrip::analysis {
 
+EnvelopeFollower::EnvelopeFollower(double rate_hz, const EnvelopeSettings& settings)
+    : dt_(static_cast<float>(1.0 / rate_hz)),
+      attack_(settings.attack_ms / 1000.0f),
+      release_(settings.release_ms / 1000.0f),
+      hold_samples_(static_cast<int>(std::lround(settings.hold_ms / 1000.0 * rate_hz))) {}
+
+float EnvelopeFollower::next(float in) {
+    if (in >= env_) {
+        hold_ = hold_samples_;
+        follow(in, env_, attack_, release_, dt_);
+    } else if (hold_ > 0) {
+        --hold_;
+    } else {
+        follow(in, env_, attack_, release_, dt_);
+    }
+    return env_;
+}
+
 std::vector<float> follow_envelope(std::span<const float> in, double rate_hz,
                                    const EnvelopeSettings& settings) {
-    const auto dt = static_cast<float>(1.0 / rate_hz);
-    const float attack = settings.attack_ms / 1000.0f;
-    const float release = settings.release_ms / 1000.0f;
-    const auto hold_samples = static_cast<int>(std::lround(settings.hold_ms / 1000.0 * rate_hz));
-
+    EnvelopeFollower follower(rate_hz, settings);
     std::vector<float> out(in.size());
-    float env = 0.0f;
-    int hold = 0;
-    for (std::size_t i = 0; i < in.size(); ++i) {
-        if (in[i] >= env) {
-            hold = hold_samples;
-            follow(in[i], env, attack, release, dt);
-        } else if (hold > 0) {
-            --hold;
-        } else {
-            follow(in[i], env, attack, release, dt);
-        }
-        out[i] = env;
-    }
+    for (std::size_t i = 0; i < in.size(); ++i) out[i] = follower.next(in[i]);
     return out;
 }
 
