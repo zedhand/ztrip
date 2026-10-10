@@ -1,0 +1,126 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://demo/stage.gd" id="1_cubfd"]
+[ext_resource type="Shader" path="res://demo/orb.gdshader" id="2_ea1dl"]
+
+[sub_resource type="Environment" id="Environment_r2iw8"]
+background_mode = 1
+background_color = Color(0.015, 0.015, 0.03, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.5, 0.55, 0.7, 1)
+ambient_light_energy = 0.2
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 1.0
+glow_bloom = 0.1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_isayx"]
+albedo_color = Color(0.12, 0.12, 0.14, 1)
+metallic = 0.2
+roughness = 0.35
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_va7q8"]
+material = SubResource("StandardMaterial3D_isayx")
+size = Vector2(40, 40)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gtueu"]
+render_priority = 0
+shader = ExtResource("2_ea1dl")
+shader_parameter/base_color = Color(0.15, 0.45, 1, 1)
+shader_parameter/glow = 0.5
+shader_parameter/pulse = 0.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_whp8a"]
+radius = 1.0
+height = 2.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_nlnu4"]
+albedo_color = Color(0.55, 0.55, 0.6, 1)
+roughness = 0.5
+
+[sub_resource type="BoxMesh" id="BoxMesh_s2avu"]
+material = SubResource("StandardMaterial3D_nlnu4")
+size = Vector3(0.5, 3, 0.5)
+
+[node name="Stage" type="Node3D" unique_id=342393381]
+script = ExtResource("1_cubfd")
+
+[node name="Environment" type="WorldEnvironment" parent="." unique_id=1548242195]
+environment = SubResource("Environment_r2iw8")
+
+[node name="Floor" type="MeshInstance3D" parent="." unique_id=1261943073]
+mesh = SubResource("PlaneMesh_va7q8")
+
+[node name="Orb" type="MeshInstance3D" parent="." unique_id=1197237900]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
+material_override = SubResource("ShaderMaterial_gtueu")
+mesh = SubResource("SphereMesh_whp8a")
+
+[node name="Pillars" type="Node3D" parent="." unique_id=358863654]
+
+[node name="Pillar0" type="MeshInstance3D" parent="Pillars" unique_id=894522925]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.5, 1.5, -0.5)
+mesh = SubResource("BoxMesh_s2avu")
+
+[node name="Pillar1" type="MeshInstance3D" parent="Pillars" unique_id=1772587970]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.7631397, 1.5, -2.5)
+mesh = SubResource("BoxMesh_s2avu")
+
+[node name="Pillar2" type="MeshInstance3D" parent="Pillars" unique_id=1194007013]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.75, 1.5, -3.9641016)
+mesh = SubResource("BoxMesh_s2avu")
+
+[node name="Pillar3" type="MeshInstance3D" parent="Pillars" unique_id=1938645388]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.0103336e-15, 1.5, -4.5)
+mesh = SubResource("BoxMesh_s2avu")
+
+[node name="Pillar4" type="MeshInstance3D" parent="Pillars" unique_id=663391551]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.75, 1.5, -3.9641016)
+mesh = SubResource("BoxMesh_s2avu")
+
+[node name="Pillar5" type="MeshInstance3D" parent="Pillars" unique_id=1422881035]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.7631397, 1.5, -2.5)
+mesh = SubResource("BoxMesh_s2avu")
+
+[node name="Pillar6" type="MeshInstance3D" parent="Pillars" unique_id=852695305]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1.5, -0.5)
+mesh = SubResource("BoxMesh_s2avu")
+
+[node name="Lights" type="Node3D" parent="." unique_id=993056300]
+
+[node name="Key" type="DirectionalLight3D" parent="Lights" unique_id=782271028]
+transform = Transform3D(0.8660254, -0.38302222, 0.32139382, 0, 0.64278764, 0.76604444, -0.5, -0.66341394, 0.5566704, 0, 0, 0)
+light_energy = 0.25
+
+[node name="Kick" type="OmniLight3D" parent="Lights" unique_id=495369085]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 1.8)
+light_color = Color(1, 0.25, 0.15, 1)
+light_energy = 0.0
+omni_range = 16.0
+
+[node name="Snare" type="SpotLight3D" parent="Lights" unique_id=1375608361]
+transform = Transform3D(0.62469506, 0.48059157, -0.6154575, 0, 0.7881701, 0.6154575, 0.7808688, -0.38447323, 0.49236596, -5, 6, 4)
+light_color = Color(0.3, 0.5, 1, 1)
+light_energy = 0.0
+spot_range = 20.0
+spot_angle = 35.0
+
+[node name="Hats" type="OmniLight3D" parent="Lights" unique_id=189993876]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 4, -2)
+light_color = Color(1, 1, 0.9, 1)
+light_energy = 0.0
+omni_range = 8.0
+
+[node name="Camera" type="Camera3D" parent="." unique_id=1729236224]
+transform = Transform3D(1, 0, 0, 0, 0.98893636, 0.14834046, 0, -0.14834046, 0.98893636, 0, 2.4, 8)
+current = true
+fov = 62.0
+
+[node name="Music" type="AudioStreamPlayer" parent="." unique_id=162191926]
+
+[node name="ZtripPlayer" type="ZtripPlayer" parent="." unique_id=709914649]
+audio_player = NodePath("../Music")
+graph_file = "res://demo/stage.mgraph.json"
+autoplay = true
+
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1366963100]
