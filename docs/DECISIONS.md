@@ -6,7 +6,7 @@ Choices made where the spec left room, newest last.
 2. **Minimum CMake 3.24**, for `FetchContent` `FIND_PACKAGE_ARGS` and presets v6.
 3. **Core target layout:** one static library `ztrip_core` with public headers under `core/include/ztrip/`. Subsystem folders (`analysis/`, `graph/`, ...) add sources to that one target as they land rather than becoming separate libraries.
 4. **CI:** GitHub Actions builds and tests on Ubuntu 24.04 (GCC) and Windows 2022 (MSVC), matching the v1 platforms.
-5. **License:** private for now; no license file is added.
+5. **License: MIT** ([LICENSE](../LICENSE)), chosen when the repository was prepared to go public. It matches Godot and godot-cpp, and every bundled dependency (pffft, nlohmann/json, godot-cpp, miniaudio, RtMidi) is MIT-compatible; their notices are in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) and ship in release archives. (Originally: private, no license file.)
 6. **Name: `ztrip`**, matching the repository, replacing the spec's working name `mre` in namespaces, targets, CMake options and header paths.
 7. **WAV only for file decode in Phase 1**, with an in-house parser (`ztrip::io::read_wav`). It has no dependencies and covers the reference tracks; libsndfile or miniaudio comes in with live capture (Phase 5) and wider formats.
 8. **pffft from its maintained fork** (marton78/pffft, tag v1.1.0), compiling only `pffft.c` and `pffft_common.c` into a private static library.
