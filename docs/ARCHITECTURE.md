@@ -116,7 +116,7 @@ Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of
 2. **Timeline sync:** `tempo_map_from_beats` turns the analysed beat grid into a tempo map that passes through the detected beats, with steady runs merged into single segments.
 3. **Note Sequences:** a `NoteSequence` has named `Lane`s of `Note`s (`start_beat`, `length_beats`, `velocity`, optional `pitch`, `envelope_ref`) and `Envelope`s (ADSR in beats, or a curve drawn over the note). Each lane has swing (0 straight, 1/3 triplet) on a swing division. `parse_grid` / `snap` cover 1/1 to 1/64 grids and triplets.
 4. **Lookup:** `LaneTimeline` resolves a lane through a tempo map (swing applied) into notes in seconds and answers gate, note starts in a tick and envelope level at any time by binary search, so evaluation stays a pure function of time.
-5. **Auto-draft:** `auto_draft` maps event lists to lanes (default: `onset.Sub` to `Kick`), drops ghost hits, quantizes to the grid when the grid point is close and keeps the strongest hit per grid step.
+5. **Auto-draft:** `auto_draft` maps event lists to lanes (default: `kick` events, else `onset.Sub`, to `Kick`), drops ghost hits, quantizes to the grid when the grid point is close and keeps the strongest hit per grid step.
 6. **Graph:** the `NoteLane` node outputs a lane's gate, triggers, envelope and velocity. `Evaluator::bind_tempo` / `bind_sequence` bind tempo maps and sequences by slot, and `BeatClock` follows a bound tempo map.
 7. **Files:** `.nseq.json` (`serialize::load_nseq` / `save_nseq`) and `.tempo.json` (`serialize::load_tempo_map` / `save_tempo_map`), versioned with migration tables like `.mgraph.json`.
 

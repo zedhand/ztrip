@@ -18,8 +18,9 @@ class TempoMap;
 // Which detected events become which lane.
 struct DraftLaneSpec {
     std::string lane;          // e.g. "Kick"
-    std::string events;        // AnalysisResult event list, e.g. "onset.Sub"
+    std::string events;        // AnalysisResult event list, e.g. "kick"
     float min_velocity = 0.0f; // weaker events are dropped
+    std::string fallback;      // event list used when `events` is missing
 };
 
 struct DraftSettings {
@@ -36,8 +37,9 @@ struct DraftSettings {
     // are dropped as ghosts (bass bleeding into the kick band, hat spill),
     // so a draft holds the hits a listener would mark. 0 keeps everything.
     double ghost_ratio = 0.3;
-    // Lanes to draft; the default is the drum kit's low end.
-    std::vector<DraftLaneSpec> lanes = {{"Kick", "onset.Sub", 0.0f}};
+    // Lanes to draft. The default Kick lane reads the dedicated kick
+    // detector's "kick" events, or the Sub band's onsets without them.
+    std::vector<DraftLaneSpec> lanes = {{"Kick", "kick", 0.0f, "onset.Sub"}};
 };
 
 // Drafts one lane from events: ghosts are dropped (see ghost_ratio), each
