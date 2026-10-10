@@ -14,6 +14,11 @@ namespace ztrip::analysis {
 struct AnalysisResult;
 }
 
+namespace ztrip::time {
+class TempoMap;
+struct NoteSequence;
+}
+
 namespace ztrip::graph {
 
 // Port types. Continuous is a float per tick; Trigger fires on the tick an
@@ -48,15 +53,24 @@ struct ParamSpec {
     std::vector<std::string> choices; // allowed values for String params, if restricted
 };
 
-// Named analysis results a graph reads from, by slot (e.g. "main", "drums").
+// Named inputs a graph reads from, by slot (e.g. "main", "drums"): analysis
+// results, tempo maps and Note Sequences, each with its own slot names.
 // Rebinding a slot repoints every source node that reads it.
 class SourceSet {
 public:
     void bind(std::string slot, const analysis::AnalysisResult* result);
     const analysis::AnalysisResult* find(std::string_view slot) const noexcept;
 
+    void bind_tempo(std::string slot, const time::TempoMap* tempo);
+    const time::TempoMap* find_tempo(std::string_view slot) const noexcept;
+
+    void bind_sequence(std::string slot, const time::NoteSequence* sequence);
+    const time::NoteSequence* find_sequence(std::string_view slot) const noexcept;
+
 private:
     std::vector<std::pair<std::string, const analysis::AnalysisResult*>> slots_;
+    std::vector<std::pair<std::string, const time::TempoMap*>> tempos_;
+    std::vector<std::pair<std::string, const time::NoteSequence*>> sequences_;
 };
 
 // Everything a node may read while evaluating one tick.

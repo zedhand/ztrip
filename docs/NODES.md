@@ -1,6 +1,6 @@
 # Node reference
 
-The Phase 2 catalog: the 15 essential nodes. Each Continuous input also has a
+The Phase 2 catalog (the 15 essential nodes) plus Phase 4's `NoteLane`. Each Continuous input also has a
 number param of the same name, used when the input is unconnected (and
 promotable to a macro). Defaults are in brackets.
 
@@ -18,11 +18,26 @@ A tick `n` is at `t = n / 120` s and reports events in `((n-1)/120, n/120]`.
 | `AudioBand` | | `out` C | `source` ["main"], `band` ["Bass"], `smoothed` [true] reads `env.<band>`, false reads `band.<band>`; `signal` [""] overrides with any signal name (e.g. `rms`, `centroid`) |
 | `AudioOnset` | | `trigger` T | `source` ["main"], `band` ["full"] reads `onset.<band>`, `min_velocity` [0] |
 | `BeatClock` | | `clock` K, `beat` T, `bar` T, `beat_phase` C, `bar_phase` C | `source` ["main"]; with no beat grid bound: `bpm` [120], `beats_per_bar` [4] |
+| `NoteLane` | | `gate` C, `trigger` T, `envelope` C, `velocity` C | `source` ["main"] tempo slot, `sequence` ["main"] Note Sequence slot, `lane` ["Kick"] |
 | `Constant` | | `out` C | `value` [0] |
 
 `source` is a slot name. `Evaluator::bind_source("main", &analysis)` points
 every node reading that slot at an analysis result, so swapping a song (or a
 stem) only rebinds the slot. Unbound sources output 0.
+
+A bound tempo map (`Evaluator::bind_tempo("main", &tempo)`) takes priority
+over the analysed beat grid for `BeatClock` and `NoteLane`: beats and bars then
+follow the map, including its offset, nudge and meter changes.
+
+`NoteLane` reads one lane of the Note Sequence bound with
+`Evaluator::bind_sequence`. `gate` is 1 while any note is held, `trigger` fires
+on note starts with the note velocity, `envelope` is the notes' envelope
+(ADSR or drawn curve, release tails included; velocity while held when a note
+has none) and `velocity` is the held note's velocity. Notes are resolved to
+seconds when bound, so rebind after editing the sequence or tempo map. With
+no tempo map bound it follows the analysed beats of its `source` slot, else a
+steady 120 BPM; with no sequence or lane it outputs 0. Pair `trigger` and
+`gate` with `ADSR` for a held-note envelope in seconds.
 
 `BeatClock` interpolates between detected beats and extrapolates outside them
 at the first and last interval; `beat` and `bar` fire only on detected beats
