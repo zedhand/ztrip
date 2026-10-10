@@ -9,6 +9,12 @@ add_library(ztrip_core STATIC
   analysis/beats.cpp
   analysis/offline.cpp
   serialize/sigcache.cpp
+  serialize/mgraph.cpp
+  graph/node.cpp
+  graph/registry.cpp
+  graph/compiler.cpp
+  graph/evaluator.cpp
+  graph/nodes.cpp
 )
 add_library(ztrip::core ALIAS ztrip_core)
 
@@ -17,5 +23,5 @@ target_include_directories(ztrip_core PUBLIC
 )
 target_compile_features(ztrip_core PUBLIC cxx_std_20)
 target_compile_definitions(ztrip_core PRIVATE ZTRIP_VERSION_STRING="${PROJECT_VERSION}")
-target_link_libraries(ztrip_core PRIVATE ztrip_pffft)
+target_link_libraries(ztrip_core PRIVATE ztrip_pffft nlohmann_json::nlohmann_json)
 ztrip_set_warnings(ztrip_core)
