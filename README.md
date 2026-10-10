@@ -2,7 +2,7 @@
 
 ztrip animates things from music. Point it at a song and it works out the beat, the bars, and when the kick, snare, bass and cymbals hit. A small node graph then turns those signals into motion: lights that flash on the kick, a camera that pushes in on the bass, materials that pulse with the hi-hats. No per-beat keyframing, and scrubbing back and forth through the song always gives the same result.
 
-Under the hood it is an engine-agnostic C++20 core with a Godot 4 host in progress and an Unreal Engine 5.6+ host planned.
+Under the hood it is an engine-agnostic C++20 core with a Godot 4 addon and an Unreal Engine 5.6+ host planned.
 
 **Beta testers:** start with [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
 
@@ -12,7 +12,7 @@ Under the hood it is an engine-agnostic C++20 core with a Godot 4 host in progre
 | --- | --- |
 | Audio analysis: bands, envelopes, onsets, tempo, beat grid, `analyze-cli` | Done |
 | Motion Graph core: compiler, evaluator, 15 nodes, `.mgraph.json` | Done |
-| Godot 4 addon: property binder, graph editor, song playback | In progress |
+| Godot 4 addon: song playback, property binder, Motion Graph panel, demo stage | Done (beta) |
 | Musical time core: tempo map, Note Sequences, auto-drafted kick lane, `NoteLane` node | Done |
 | Musical time: timeline dock in Godot | Planned for beta |
 | Live input: mic, MIDI, OSC, DMX | After beta |
@@ -31,6 +31,15 @@ ctest --preset release
 ```
 
 Use the `dev` preset for a Debug build in `build/dev`.
+
+## Try it in Godot
+
+```sh
+cmake --preset godot
+cmake --build --preset godot
+```
+
+Then open `hosts/godot/project` in Godot 4.5 or newer, drop a WAV onto the demo stage's `Music` node and scrub the `ZtripPlayer`'s **Time**: lights, the orb's material and the camera follow the song in the editor. [hosts/godot/README.md](hosts/godot/README.md) covers the addon, target paths and the graph panel.
 
 ## Analyse a track
 
@@ -69,6 +78,7 @@ ev.bind_sequence("main", &seq);
 - [GETTING_STARTED.md](docs/GETTING_STARTED.md): build, analyse a song, report problems
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): data flow, analysis pipeline, graph evaluation, file formats
 - [NODES.md](docs/NODES.md): Motion Graph node reference
+- [hosts/godot/README.md](hosts/godot/README.md): the Godot addon
 - [DECISIONS.md](docs/DECISIONS.md): design decisions and why
 - [RELEASING.md](docs/RELEASING.md): versioning, beta downloads and cutting a release
 

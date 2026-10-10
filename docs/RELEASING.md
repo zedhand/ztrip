@@ -39,6 +39,13 @@ cmake --build --preset release
 cpack --config build/release/CPackConfig.cmake -B build/release/packages
 ```
 
+The `godot` preset builds the same archive plus a `godot/` folder holding the
+demo project with the built addon (the `godot` component). The release
+workflow still uses the `release` preset: with the Godot host on, MSVC builds
+use the static runtime that godot-cpp needs, and the SDK library would then
+no longer link into ordinary `/MD` consumer projects. Until the addon gets its
+own build in the workflow, CI uploads it as the `ztrip-godot-*` artifacts.
+
 ## Cutting a release
 
 1. Set the version in `CMakeLists.txt` and merge it to `main`.

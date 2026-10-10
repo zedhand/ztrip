@@ -1,0 +1,5 @@
+# Godot caches and imports
+.godot/
+# Songs are not committed (see music/README.md)
+music/*
+!music/README.md
