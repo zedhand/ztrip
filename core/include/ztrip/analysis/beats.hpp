@@ -13,7 +13,10 @@ struct BeatSettings {
     float max_bpm = 220.0f;
     float prior_bpm = 120.0f;    // centre of the log-normal tempo prior
     float prior_octaves = 0.5f;  // standard deviation of the prior, in octaves
-    float tightness = 100.0f;    // how strongly beats are held to the tempo
+    // How strongly beats are held to the tempo. Loose tracking slips half a
+    // beat onto off-beat hits and back on live and busy mixes, which shows up
+    // as pairs of short gaps and a tempo map that jumps by 30%.
+    float tightness = 1600.0f;
     int beats_per_bar = 4;
     // With drum hits (kick and snare events) given to analyze_beats:
     float drum_weight = 0.25f;        // weight of the drum-hit curve added to the onset strength for tracking
@@ -24,6 +27,10 @@ struct BeatSettings {
     float min_drum_fit = 0.5f;
     float min_drum_precision = 0.55f;
     float drum_fit_margin = 0.1f;
+    // Tightness of the trial tracks scored against the drum hits. Looser
+    // than `tightness` so a candidate tempo can still find the hits when the
+    // first estimate's phase is off.
+    float check_tightness = 100.0f;
 };
 
 struct BeatGrid {
