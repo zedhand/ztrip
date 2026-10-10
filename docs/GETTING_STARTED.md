@@ -94,12 +94,13 @@ onset.Sub        131
 onset.Bass       195
 ...
 kick             112
+snare            49
 tempo map song-analysis/song.tempo.json (1 segments)
 lane      Kick: 112 notes -> song-analysis/song.nseq.json
 plots     python3 song-analysis/plot.py
 ```
 
-The first thing to check is the **tempo** line. If you know the song's BPM, compare. Getting half or double the real tempo (64 or 256 instead of 128) is a known failure mode worth reporting. The `kick` line counts the kick drum hits it found.
+The first thing to check is the **tempo** line. If you know the song's BPM, compare. Getting half or double the real tempo (64 or 256 instead of 128) is a known failure mode worth reporting. The `kick` and `snare` lines count the drum hits it found.
 
 ### 3. Look at the result
 
@@ -109,7 +110,7 @@ The output folder holds:
 | --- | --- |
 | `<name>.sigcache` | The analysis in ztrip's binary format. Re-running with the same song and settings reuses it instead of recomputing. |
 | `signals.csv` | 120 values per second for each band level (`band.Sub` ... `band.Air`), its smoothed envelope (`env.*`), overall loudness (`rms`) and brightness (`centroid`). All are 0 to 1. |
-| `events.csv` | Every detected onset per band, plus each beat and downbeat, with a time in seconds and a strength from 0 to 1. |
+| `events.csv` | Every detected onset per band, kick and snare, plus each beat and downbeat, with a time in seconds and a strength from 0 to 1. |
 | `beats.csv` | The beat grid: time, bar number, beat number in the bar, and whether it is a downbeat. |
 | `<name>.tempo.json` | The tempo map: the song's tempo, bar by bar, fitted to the detected beats. |
 | `<name>.nseq.json` | A Note Sequence with a Kick lane: one note per detected kick, snapped to a 1/16 grid. |
@@ -122,7 +123,7 @@ To see it as a picture, install Python 3 with numpy and matplotlib once. On Ubun
 python3 song-analysis/plot.py --start 30 --end 45
 ```
 
-That writes `song-analysis/analysis.png` for 30 s to 45 s of the song. There is one row per band, from Sub (deep bass, 20-60 Hz) up to Air (cymbal shimmer, 6-20 kHz), and a bottom row with loudness and the beat grid. In each band row, the light fill is the level, the dark line is the envelope, and red ticks are detected hits. Orange triangles along the top of the Sub row are the kicks. Dashed grey lines mark the start of each bar.
+That writes `song-analysis/analysis.png` for 30 s to 45 s of the song. There is one row per band, from Sub (deep bass, 20-60 Hz) up to Air (cymbal shimmer, 6-20 kHz), and a bottom row with loudness and the beat grid. In each band row, the light fill is the level, the dark line is the envelope, and red ticks are detected hits. Orange triangles along the top of the Sub row are the kicks, and green triangles along the top of the Mid row are the snares. Dashed grey lines mark the start of each bar.
 
 Quick checks that need no musical training:
 
@@ -141,7 +142,8 @@ Run `analyze-cli --help` for the full list. The ones most worth trying:
 | `--bpm-prior BPM` | 120 | The tempo comes out at half or double the real one. Set this near the real BPM. |
 | `--sensitivity X` | 1.5 | Too many red ticks: raise it. Hits are missed: lower it. |
 | `--min-gap MS` | 50 | Fast rolls are merged into one hit: lower it. |
-| `--kick-rise DB` | 12 | Clicks with no kick under them: raise it. Kicks are missed: lower it. |
+| `--kick-jump X` | 0.4 | Clicks with no kick under them: raise it (0.5). Kicks are missed: lower it (0.3). |
+| `--kick-gate DB` | 5 | Quieter kicks are missed: raise it (8). Bass notes count as kicks: lower it. |
 | `--nudge MS` | 0 | Every click is early or late by the same amount: shift them (positive is later). |
 | `--release MS` | 150 | Envelopes fall too slowly (lights would linger): lower it. |
 | `--beats-per-bar N` | 4 | Songs in 3/4 or 6/8. |
@@ -167,7 +169,7 @@ You need [Godot 4.5 or newer](https://godotengine.org/download) (the standard bu
    ```
 
 2. In Godot's Project Manager, choose **Import** and open `hosts/godot/project/project.godot`.
-3. Copy a WAV into the project's `music/` folder (it shows up in the FileSystem dock). If Godot reports "Format not supported for WAVE file", re-save it as 16-bit PCM: `ffmpeg -i song.wav -c:a pcm_s16le song16.wav`.
+3. Copy a WAV into the project's `music/` folder (it shows up in the FileSystem dock). Godot can't import the 24-bit and float WAVs many tools save, so for those you see a "Format not supported for WAVE file" error followed straight away by "ztrip: rewrote the header of ...": the addon has rewritten the file's header (the audio itself is unchanged) and Godot imports it again.
 4. Open `demo/stage.tscn`, select the `Music` node and drag your WAV onto its **Stream** in the inspector.
 5. Select the `ZtripPlayer` node. After a second or two its **Status** shows the song's length and tempo.
 6. Drag **Time** to scrub, or tick **Playing** to hear the song while the scene reacts, without pressing Play. Press F5 to run the stage full screen with its beat counter.
@@ -212,12 +214,14 @@ What to look for: the scene follows the fader within a frame. On Linux, MIDI nee
 
 ## Known limitations
 
-- Input must be WAV; convert other formats first. In Godot, WAVs must be plain PCM (see [Godot addon](#godot-addon)).
+- Input must be WAV; convert other formats first.
 - Songs played live (not to a click) can drift in tempo. The drafted tempo map follows the detected beats, but where the beat tracker slipped onto the off-beat the grid does too; nudge or re-draw those notes in the Timeline.
 - Snare and Hats lanes are drafted from plain band onsets and need cleaning up on busy mixes.
 - Tempo changes can't be drawn in the Timeline yet (only nudged and scaled); edit the `.tempo.json` for that.
 - The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick. The Timeline's Kick lane uses the dedicated kick detector instead.
-- Live audio has no beat grid or dedicated kick detector yet: `BeatClock` runs at a fixed `bpm`, and kicks come from Sub-band onsets. There is no learn button in the editor yet (use `learn_macro()` from a script), no MIDI clock or OSC output, and no gamepad or keyboard input.
+- Kicks more than 5 dB quieter than the loudest ones are skipped (soft ghost notes, or a quiet intro before a loud song). `--kick-gate 8` keeps more of them.
+- Drum and bass reads at half tempo (85 instead of 170 BPM). Use `--bpm-prior 170`.
+- Live audio has no beat grid or dedicated kick and snare detectors yet: `BeatClock` runs at a fixed `bpm`, and kicks come from Sub-band onsets. There is no learn button in the editor yet (use `learn_macro()` from a script), no MIDI clock or OSC output, and no gamepad or keyboard input.
 
 ## Reporting problems
 
