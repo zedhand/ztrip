@@ -41,7 +41,7 @@ install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/ztripConfigVersion.cmake"
   DESTINATION ${ZTRIP_CMAKE_INSTALL_DIR} COMPONENT sdk)
 
-install(FILES README.md packaging/BETA.md
+install(FILES README.md packaging/BETA.md LICENSE THIRD_PARTY_NOTICES.md PRIVACY.md
   DESTINATION . COMPONENT docs)
 install(DIRECTORY docs/ DESTINATION docs COMPONENT docs)
 install(DIRECTORY examples/ DESTINATION examples COMPONENT docs)
