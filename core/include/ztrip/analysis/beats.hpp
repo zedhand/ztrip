@@ -25,8 +25,9 @@ struct BeatGrid {
 };
 
 // Global tempo estimate from the autocorrelation of an onset-strength curve
-// sampled at frame_rate, weighted by the tempo prior. Returns BPM, or 0 if
-// the curve is too short or silent.
+// sampled at frame_rate: each tempo scores the autocorrelation at its beat
+// period plus at half that period (the subdivision), weighted by the tempo
+// prior. Returns BPM, or 0 if the curve is too short or silent.
 double estimate_tempo(std::span<const float> onset_strength, double frame_rate,
                       const BeatSettings& settings);
 
