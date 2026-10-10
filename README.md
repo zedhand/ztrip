@@ -34,6 +34,8 @@ Use the `dev` preset for a Debug build in `build/dev`.
 
 ## Try it in Godot
 
+The release downloads include the demo project with the addon already built (their `godot/` folder). From source:
+
 ```sh
 cmake --preset godot
 cmake --build --preset godot

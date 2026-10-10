@@ -11,8 +11,8 @@ Thanks for trying the ztrip beta. This archive holds:
 - `docs/`: architecture, node reference and design decisions.
 - `licenses/`: licenses of third-party code compiled into ztrip.
 
-- `godot/` (only in archives built with the `godot` preset): the Godot 4.5+
-  demo project with the ztrip addon already built into `addons/ztrip/bin/`.
+- `godot/`: the Godot 4.5+ demo project with the ztrip addon already built
+  into `addons/ztrip/bin/`.
   In Godot's Project Manager choose **Import** and open `godot/project.godot`,
   then follow "Try the demo" in `godot/README.md` (it is written for the
   source tree, where this folder is `hosts/godot/project/`). Godot can't load the
