@@ -1,0 +1,131 @@
+name: Release
+
+# Builds the Windows and Linux beta archives. On a pushed v* tag it also
+# creates a draft GitHub release with them; publishing stays a manual step.
+# See docs/RELEASING.md.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - CMakeLists.txt
+      - CMakePresets.json
+      - cmake/**
+      - packaging/**
+      - tests/package-consumer/**
+      - '**/CMakeLists.txt'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 22.04 keeps the glibc requirement at 2.35; GCC 12 for C++20.
+          - platform: linux-x86_64
+            os: ubuntu-22.04
+            cc: gcc-12
+            cxx: g++-12
+            ldflags: -static-libstdc++ -static-libgcc
+          - platform: windows-x64
+            os: windows-2022
+            cc: cl
+            cxx: cl
+            ldflags: ''
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Install toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build g++-12
+      - name: Configure
+        run: >
+          cmake --preset release
+          -DZTRIP_PACKAGE_PLATFORM=${{ matrix.platform }}
+          "-DCMAKE_EXE_LINKER_FLAGS=${{ matrix.ldflags }}"
+      - name: Check tag matches version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < build/release/ztrip-version.txt)"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match CMake version ${version} (expected tag v${version})"
+            exit 1
+          fi
+      - name: Build
+        run: cmake --build --preset release
+      - name: Test
+        run: ctest --preset release
+      - name: Package
+        run: cpack --config build/release/CPackConfig.cmake -B build/release/packages
+      - name: Check archive
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < build/release/ztrip-version.txt)"
+          name="ztrip-${version}-${{ matrix.platform }}"
+          archive=""
+          for f in "build/release/packages/${name}.zip" "build/release/packages/${name}.tar.gz"; do
+            if [ -f "$f" ]; then archive="$f"; fi
+          done
+          if [ -z "${archive}" ]; then echo "::error::No archive named ${name}"; exit 1; fi
+          mkdir -p build/extract
+          (cd build/extract && cmake -E tar xf "../../${archive}")
+          root="$PWD/build/extract/${name}"
+
+          reported="$("${root}/bin/analyze-cli" --version | tr -d '\r')"
+          echo "${reported}"
+          [ "${reported}" = "analyze-cli ${version}" ]
+
+          cmake -S tests/package-consumer -B build/consumer -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=${root}"
+          cmake --build build/consumer
+          build/consumer/consumer "${root}/examples/kick_to_light.mgraph.json"
+
+          echo "ARCHIVE=${archive}" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ztrip-${{ matrix.platform }}
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
+
+  release:
+    name: Draft GitHub release
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          prerelease=""
+          case "${GITHUB_REF_NAME}" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --draft ${prerelease} \
+            --verify-tag \
+            --title "ztrip ${GITHUB_REF_NAME#v}" \
+            --generate-notes
