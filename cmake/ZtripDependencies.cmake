@@ -22,3 +22,14 @@ target_include_directories(ztrip_pffft
 )
 target_compile_definitions(ztrip_pffft PUBLIC PFFFT_STATIC_DEFINE PRIVATE _USE_MATH_DEFINES)
 set_target_properties(ztrip_pffft PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# nlohmann/json: .mgraph.json (and later project/sequence) load and save.
+# Header-only and used privately by ztrip_core; the release tarball skips the
+# repository's large test data.
+FetchContent_Declare(nlohmann_json
+  URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+  URL_HASH SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  FIND_PACKAGE_ARGS 3.11
+)
+FetchContent_MakeAvailable(nlohmann_json)
