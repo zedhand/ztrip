@@ -1,18 +1,18 @@
 #pragma once
 
-#include "mre/analysis/bands.hpp"
-#include "mre/analysis/beats.hpp"
-#include "mre/analysis/envelope.hpp"
-#include "mre/analysis/onsets.hpp"
-#include "mre/analysis/stft.hpp"
-#include "mre/io/wav.hpp"
+#include "ztrip/analysis/bands.hpp"
+#include "ztrip/analysis/beats.hpp"
+#include "ztrip/analysis/envelope.hpp"
+#include "ztrip/analysis/onsets.hpp"
+#include "ztrip/analysis/stft.hpp"
+#include "ztrip/io/wav.hpp"
 
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 
 struct AnalysisSettings {
     int channel = -1; // -1 = mono sum, otherwise a single channel
@@ -69,4 +69,4 @@ std::uint64_t audio_hash(const io::AudioBuffer& audio);
 // Hash of every setting that affects the analysis output.
 std::uint64_t settings_hash(const AnalysisSettings& settings);
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

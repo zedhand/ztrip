@@ -1,6 +1,6 @@
-#include "mre/analysis/bands.hpp"
-#include "mre/analysis/onsets.hpp"
-#include "mre/analysis/stft.hpp"
+#include "ztrip/analysis/bands.hpp"
+#include "ztrip/analysis/onsets.hpp"
+#include "ztrip/analysis/stft.hpp"
 
 #include "synth.hpp"
 
@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <cmath>
 
-using namespace mre::analysis;
+using namespace ztrip::analysis;
 
 namespace {
 
@@ -50,7 +50,7 @@ Match match(const std::vector<Trigger>& det, const std::vector<double>& ref, dou
 TEST_CASE("kick and snare onsets land on their own bands within 15 ms", "[onsets]") {
     const int sr = 48000;
     const double bpm = 110.0;
-    const auto x = mre::test::groove(sr, bpm, 4, 0.3, true, false);
+    const auto x = ztrip::test::groove(sr, bpm, 4, 0.3, true, false);
     const auto spec = compute_stft(x, sr, {});
 
     std::vector<double> kicks, snares;
@@ -82,8 +82,8 @@ TEST_CASE("kick and snare onsets land on their own bands within 15 ms", "[onsets
 TEST_CASE("minimum gap merges hits closer than the gap", "[onsets]") {
     const int sr = 48000;
     std::vector<float> x(sr * 2, 0.0f);
-    mre::test::Noise noise(7);
-    for (double t : {0.5, 0.53, 1.2}) mre::test::add_snare(x, sr, t, noise);
+    ztrip::test::Noise noise(7);
+    for (double t : {0.5, 0.53, 1.2}) ztrip::test::add_snare(x, sr, t, noise);
     const auto spec = compute_stft(x, sr, {});
     const auto flux = band_flux(spec, {"HighMid", 2000.0f, 6000.0f});
 

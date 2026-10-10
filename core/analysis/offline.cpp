@@ -1,11 +1,11 @@
-#include "mre/analysis/offline.hpp"
+#include "ztrip/analysis/offline.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <type_traits>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 namespace {
 
 void add_signal(AnalysisResult& r, std::string name, std::vector<float> values) {
@@ -173,4 +173,4 @@ std::uint64_t settings_hash(const AnalysisSettings& s) {
     return h.value();
 }
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

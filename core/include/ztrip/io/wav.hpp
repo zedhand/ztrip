@@ -6,7 +6,7 @@
 #include <span>
 #include <vector>
 
-namespace mre::io {
+namespace ztrip::io {
 
 // Decoded PCM audio, samples interleaved and scaled to [-1, 1].
 struct AudioBuffer {
@@ -34,4 +34,4 @@ AudioBuffer read_wav(const std::filesystem::path& path);
 // otherwise that single channel is returned.
 std::vector<float> to_mono(const AudioBuffer& audio, int channel = -1);
 
-} // namespace mre::io
+} // namespace ztrip::io

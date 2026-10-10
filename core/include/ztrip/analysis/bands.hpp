@@ -1,12 +1,12 @@
 #pragma once
 
-#include "mre/analysis/stft.hpp"
+#include "ztrip/analysis/stft.hpp"
 
 #include <span>
 #include <string>
 #include <vector>
 
-namespace mre::analysis {
+namespace ztrip::analysis {
 
 struct Band {
     std::string name;
@@ -38,4 +38,4 @@ float percentile(std::span<const float> values, float p);
 // Frame-weighted spectral centroid in Hz.
 std::vector<float> spectral_centroid(const Spectrogram& spec);
 
-} // namespace mre::analysis
+} // namespace ztrip::analysis

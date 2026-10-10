@@ -6,7 +6,7 @@
 #include <numbers>
 #include <vector>
 
-namespace mre::test {
+namespace ztrip::test {
 
 class Noise {
 public:
@@ -74,4 +74,4 @@ inline std::vector<float> groove(int sr, double bpm, int bars, double first_beat
     return x;
 }
 
-} // namespace mre::test
+} // namespace ztrip::test

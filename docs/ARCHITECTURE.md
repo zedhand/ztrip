@@ -1,6 +1,6 @@
 # Architecture
 
-`mre` (working name, "music-reactive engine") animates scene properties from music. All logic lives in one C++20 core library with no engine headers. The Godot 4 app and the Unreal Engine 5.6+ plugin are thin hosts that supply UI, a timeline, a property binder and rendering. A `.mgraph.json` saved in one host must load and behave identically in the other.
+`ztrip`, a music-reactive animation engine, animates scene properties from music. All logic lives in one C++20 core library with no engine headers. The Godot 4 app and the Unreal Engine 5.6+ plugin are thin hosts that supply UI, a timeline, a property binder and rendering. A `.mgraph.json` saved in one host must load and behave identically in the other.
 
 ## Data flow
 
@@ -19,7 +19,7 @@ Inputs -> Input adapters -> Analysis -> Musical time -> Motion Graph -> Host bin
 
 ```text
 core/            C++20 library, no engine headers
-  include/mre/   public headers
+  include/ztrip/   public headers
   src/           shared implementation
   analysis/      STFT, bands, onsets, beat tracking, stems (onnx)
   graph/         node registry, compiler, evaluator, function nodes
@@ -35,7 +35,7 @@ tests/           unit, determinism and analysis accuracy tests (Catch2)
 docs/            ARCHITECTURE.md, DECISIONS.md, node reference
 ```
 
-Core builds with CMake as the static library `mre_core` (alias `mre::core`). UE links it as a ThirdParty static library through `Build.cs`; Godot links it through godot-cpp.
+Core builds with CMake as the static library `ztrip_core` (alias `ztrip::core`). UE links it as a ThirdParty static library through `Build.cs`; Godot links it through godot-cpp.
 
 ## Building
 
@@ -47,7 +47,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Options: `MRE_BUILD_TOOLS` and `MRE_BUILD_TESTS` (both `ON` by default). Catch2 is fetched at configure time unless an installed Catch2 3.x is found; pffft (v1.1.0, the FFT) is always fetched and only its float FFT sources are compiled.
+Options: `ZTRIP_BUILD_TOOLS` and `ZTRIP_BUILD_TESTS` (both `ON` by default). Catch2 is fetched at configure time unless an installed Catch2 3.x is found; pffft (v1.1.0, the FFT) is always fetched and only its float FFT sources are compiled.
 
 ## Threading
 
@@ -77,9 +77,9 @@ Every input becomes a typed signal. Every graph evaluation is a function of (tim
 
 ## Offline analysis (Phase 1)
 
-`mre::analysis::analyze()` turns mono (or one selected channel of) PCM into an `AnalysisResult`:
+`ztrip::analysis::analyze()` turns mono (or one selected channel of) PCM into an `AnalysisResult`:
 
-1. **Decode:** `mre::io::read_wav` (8/16/24/32-bit PCM, 32/64-bit float, `WAVE_FORMAT_EXTENSIBLE`).
+1. **Decode:** `ztrip::io::read_wav` (8/16/24/32-bit PCM, 32/64-bit float, `WAVE_FORMAT_EXTENSIBLE`).
 2. **STFT:** pffft real FFT, size 512-8192 (default 2048), hop size/4, Hann/Hamming/Blackman-Harris. Frames are centred (frame `i` at `i * hop / sr`) and magnitudes are window-normalised.
 3. **Bands:** default Sub, Bass, LowMid, Mid, HighMid, Air. Per-frame energy in dB, normalised to 0-1 between the 5th and 99th whole-file percentiles (with the low anchor no more than 60 dB below the high one), resampled to 120 Hz as `band.<Name>`.
 4. **Envelopes:** the spec's attack/release follower (plus optional hold) over each 120 Hz band level, as `env.<Name>`.
@@ -91,7 +91,7 @@ Offline buffers are pure functions of the file and settings, so `AnalysisResult:
 
 ### `.sigcache` format
 
-Little-endian binary: magic `MRESIGC\0`, format version, 64-bit FNV-1a hashes of the decoded audio and of every analysis setting (plus a pipeline version), then signal rate, duration, BPM, beats per bar, downbeat phase, the named signal buffers (f32), the named event lists (f64 time, f32 velocity) and the beat and downbeat times. A cache is reused only when both hashes match; malformed or stale files are ignored and regenerated. See `core/include/mre/serialize/sigcache.hpp`.
+Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of the decoded audio and of every analysis setting (plus a pipeline version), then signal rate, duration, BPM, beats per bar, downbeat phase, the named signal buffers (f32), the named event lists (f64 time, f32 velocity) and the beat and downbeat times. A cache is reused only when both hashes match; malformed or stale files are ignored and regenerated. See `core/include/ztrip/serialize/sigcache.hpp`.
 
 ## Persisted formats
 

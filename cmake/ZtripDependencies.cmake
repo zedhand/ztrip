@@ -1,4 +1,4 @@
-# Third-party dependencies for mre_core, fetched at configure time.
+# Third-party dependencies for ztrip_core, fetched at configure time.
 include(FetchContent)
 
 # pffft: SIMD FFT used by the STFT. Only the float FFT sources are built;
@@ -8,17 +8,17 @@ FetchContent_Declare(pffft
   GIT_REPOSITORY https://github.com/marton78/pffft.git
   GIT_TAG        v1.1.0
   GIT_SHALLOW    TRUE
-  SOURCE_SUBDIR  mre-no-cmake
+  SOURCE_SUBDIR  ztrip-no-cmake
 )
 FetchContent_MakeAvailable(pffft)
 
-add_library(mre_pffft STATIC
+add_library(ztrip_pffft STATIC
   ${pffft_SOURCE_DIR}/src/pffft.c
   ${pffft_SOURCE_DIR}/src/pffft_common.c
 )
-target_include_directories(mre_pffft
+target_include_directories(ztrip_pffft
   PUBLIC  ${pffft_SOURCE_DIR}/include/pffft
   PRIVATE ${pffft_SOURCE_DIR}/src
 )
-target_compile_definitions(mre_pffft PUBLIC PFFFT_STATIC_DEFINE PRIVATE _USE_MATH_DEFINES)
-set_target_properties(mre_pffft PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_definitions(ztrip_pffft PUBLIC PFFFT_STATIC_DEFINE PRIVATE _USE_MATH_DEFINES)
+set_target_properties(ztrip_pffft PROPERTIES POSITION_INDEPENDENT_CODE ON)

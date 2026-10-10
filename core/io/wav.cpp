@@ -1,4 +1,4 @@
-#include "mre/io/wav.hpp"
+#include "ztrip/io/wav.hpp"
 
 #include <cstring>
 #include <fstream>
@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace mre::io {
+namespace ztrip::io {
 namespace {
 
 constexpr std::uint16_t kFormatPcm = 1;
@@ -149,4 +149,4 @@ std::vector<float> to_mono(const AudioBuffer& audio, int channel) {
     return mono;
 }
 
-} // namespace mre::io
+} // namespace ztrip::io
