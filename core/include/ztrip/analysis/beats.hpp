@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ztrip/analysis/onsets.hpp"
 #include "ztrip/analysis/stft.hpp"
 
 #include <span>
@@ -14,6 +15,15 @@ struct BeatSettings {
     float prior_octaves = 0.5f;  // standard deviation of the prior, in octaves
     float tightness = 100.0f;    // how strongly beats are held to the tempo
     int beats_per_bar = 4;
+    // With drum hits (kick and snare events) given to analyze_beats:
+    float drum_weight = 0.25f;        // weight of the drum-hit curve added to the onset strength for tracking
+    // A related tempo (x1/2, x2/3, x3/2, x2) replaces the estimate only when
+    // its beats fit the drum hits with at least min_drum_fit (F), at least
+    // min_drum_precision of its beats land on a hit, and its fit beats the
+    // estimate's by drum_fit_margin.
+    float min_drum_fit = 0.5f;
+    float min_drum_precision = 0.55f;
+    float drum_fit_margin = 0.1f;
 };
 
 struct BeatGrid {
@@ -43,8 +53,22 @@ std::vector<double> track_beats(std::span<const float> onset_strength, double fr
 int estimate_downbeat_phase(const Spectrogram& spec, std::span<const double> beats,
                             int beats_per_bar);
 
-// Full offline beat grid: tempo, beats and downbeats.
+// How well a beat grid matches drum hits: precision is the share of beats
+// with a hit within the tolerance (min(50 ms, period / 6)), recall the share
+// of hit velocity that lands on a beat, f their harmonic mean.
+struct DrumFit {
+    double f = 0.0;
+    double precision = 0.0;
+    double recall = 0.0;
+};
+DrumFit drum_fit(std::span<const double> beats, std::span<const Trigger> hits);
+
+// Full offline beat grid: tempo, beats and downbeats. With drum hits (kicks
+// and snares together), the tempo estimate is checked against its related
+// tempos by drum_fit, and tracking listens to the hits as well as the onset
+// strength, so fast metal is not read at half speed and four-on-the-floor
+// tracks don't settle on the off-beat hats and bass.
 BeatGrid analyze_beats(const Spectrogram& spec, std::span<const float> onset_strength,
-                       const BeatSettings& settings);
+                       const BeatSettings& settings, std::span<const Trigger> drum_hits = {});
 
 } // namespace ztrip::analysis
