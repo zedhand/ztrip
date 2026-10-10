@@ -1,6 +1,6 @@
 # Getting started (beta)
 
-This guide is for beta testers. It walks you through building ztrip, running the analyser on a song of your own, and reading what it found. Then it shows the addon in Godot and the timeline where you fix what the analyser got wrong.
+This guide is for beta testers. It walks you through getting ztrip (a download or a build from source), running the analyser on a song of your own, and reading what it found. Then it shows the addon in Godot and the timeline where you fix what the analyser got wrong.
 
 If something here does not match what you see, that is worth reporting too (see [Reporting problems](#reporting-problems)).
 
@@ -17,9 +17,20 @@ If something here does not match what you see, that is worth reporting too (see 
 
 Supported platforms for the beta are Windows 11 and Linux. macOS is not supported yet.
 
+## Download
+
+Each beta release on the [Releases page](https://github.com/zedhand/ztrip/releases) has two downloads:
+
+- `ztrip-<version>-windows-x64.zip` for Windows 11 (x64)
+- `ztrip-<version>-linux-x86_64.tar.gz` for Linux (x86_64, glibc 2.35 or newer, for example Ubuntu 22.04)
+
+Extract it anywhere. It holds the analyser (`bin/analyze-cli`, `bin\analyze-cli.exe` on Windows), the Godot demo project with the addon already built (`godot/`), the C++ library, docs and examples. `BETA.md` in the archive lists what is where. With a download you need no compiler: skip to [Analyse a song](#analyse-a-song), and run the analyser as `bin/analyze-cli` (`bin\analyze-cli.exe`) from the extracted folder instead of the `build/...` paths shown there.
+
+If there is no release yet, or you want the latest `main`, build from source.
+
 ## Build from source
 
-Prebuilt downloads are planned for the beta. Until they exist, build from source; it takes a few minutes and needs no manual dependency installs beyond the compiler and build tools (the rest is fetched by CMake on first configure, so the first build needs internet access).
+Building takes a few minutes and needs no manual dependency installs beyond the compiler and build tools (the rest is fetched by CMake on first configure, so the first build needs internet access).
 
 ### Linux
 
@@ -159,16 +170,18 @@ Graphs run in the Godot addon (below), which also has a panel for editing them, 
 
 ## Godot addon
 
-You need [Godot 4.5 or newer](https://godotengine.org/download) (the standard build, not .NET) and the build tools from [Build from source](#build-from-source).
+You need [Godot 4.5 or newer](https://godotengine.org/download) (the standard build, not .NET).
 
-1. Build the addon from the ztrip folder (the first build takes several minutes):
+1. Get the demo project with the addon built in:
+   - **From a download:** it is the `godot/` folder of the extracted archive. Nothing to build.
+   - **From source:** build the addon from the ztrip folder with the build tools from [Build from source](#build-from-source) (the first build takes several minutes). The project is `hosts/godot/project/`.
 
-   ```sh
-   cmake --preset godot
-   cmake --build --preset godot
-   ```
+     ```sh
+     cmake --preset godot
+     cmake --build --preset godot
+     ```
 
-2. In Godot's Project Manager, choose **Import** and open `hosts/godot/project/project.godot`.
+2. In Godot's Project Manager, choose **Import** and open `project.godot` in that folder (`godot/project.godot` in a download, `hosts/godot/project/project.godot` from source).
 3. Copy a WAV into the project's `music/` folder (it shows up in the FileSystem dock). Godot can't import the 24-bit and float WAVs many tools save, so for those you see a "Format not supported for WAVE file" error followed straight away by "ztrip: rewrote the header of ...": the addon has rewritten the file's header (the audio itself is unchanged) and Godot imports it again.
 4. Open `demo/stage.tscn`, select the `Music` node and drag your WAV onto its **Stream** in the inspector.
 5. Select the `ZtripPlayer` node. After a second or two its **Status** shows the song's length and tempo.
