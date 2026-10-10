@@ -1,9 +1,28 @@
 name: CI
 
+# Sized for the free private-repo Actions quota, where Windows minutes count
+# double (see docs/DECISIONS.md):
+# - pull requests that aren't drafts: one Linux GCC release build and tests;
+# - pushes to main: that, plus the Godot host on Linux;
+# - the weekly schedule and manual dispatch (Actions > CI > Run workflow):
+#   everything, adding Windows MSVC and the Godot host on Windows.
+# Docs-only changes skip it all. Compiles (ccache) and the FetchContent
+# downloads are cached; caches are written from main, which pull requests can read.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - docs/**
+      - LICENSE*
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - '**.md'
+      - docs/**
+      - LICENSE*
+  schedule:
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -13,59 +32,19 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  CMAKE_C_COMPILER_LAUNCHER: ccache
+  CMAKE_CXX_COMPILER_LAUNCHER: ccache
+
 jobs:
   build:
-    name: ${{ matrix.name }} (${{ matrix.preset }})
+    name: ${{ matrix.name }} (release)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     strategy:
       fail-fast: false
       matrix:
-        preset: [dev, release]
-        name: [Linux GCC, Linux Clang, Windows MSVC]
-        include:
-          - name: Linux GCC
-            os: ubuntu-24.04
-            cc: gcc
-            cxx: g++
-          - name: Linux Clang
-            os: ubuntu-24.04
-            cc: clang
-            cxx: clang++
-          - name: Windows MSVC
-            os: windows-2022
-            cc: cl
-            cxx: cl
-    runs-on: ${{ matrix.os }}
-    env:
-      CC: ${{ matrix.cc }}
-      CXX: ${{ matrix.cxx }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ilammy/msvc-dev-cmd@v1
-        if: runner.os == 'Windows'
-      - name: Install Ninja
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
-      - name: Configure
-        run: cmake --preset ${{ matrix.preset }}
-      - name: Build
-        run: cmake --build --preset ${{ matrix.preset }}
-      - name: Test
-        run: ctest --preset ${{ matrix.preset }}
-
-  godot:
-    name: Godot host (${{ matrix.name }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Linux
-            os: ubuntu-24.04
-            cc: gcc
-            cxx: g++
-          - name: Windows
-            os: windows-2022
-            cc: cl
-            cxx: cl
+        # Windows only on the full runs (schedule, dispatch).
+        include: ${{ fromJSON(contains(fromJSON('["schedule","workflow_dispatch"]'), github.event_name) && '[{"name":"Linux GCC","os":"ubuntu-24.04","cc":"gcc","cxx":"g++"},{"name":"Windows MSVC","os":"windows-2022","cc":"cl","cxx":"cl"}]' || '[{"name":"Linux GCC","os":"ubuntu-24.04","cc":"gcc","cxx":"g++"}]') }}
     runs-on: ${{ matrix.os }}
     env:
       CC: ${{ matrix.cc }}
@@ -80,8 +59,64 @@ jobs:
       - name: Install Ninja
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: build-${{ matrix.os }}
+          max-size: 500M
+          save: ${{ github.event_name != 'pull_request' }}
+      - uses: actions/cache@v4
+        with:
+          # The downloaded sources only; the dependency builds come from ccache.
+          path: |
+            build/release/_deps
+            !build/release/_deps/*-build
+          key: fetchcontent-release-${{ matrix.os }}-${{ hashFiles('cmake/ZtripDependencies.cmake', 'tests/CMakeLists.txt') }}
       - name: Configure
-        run: cmake --preset godot
+        run: cmake --preset release -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+      - name: Build
+        run: cmake --build --preset release
+      - name: Test
+        run: ctest --preset release
+
+  godot:
+    name: Godot host (${{ matrix.os }})
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux on every push to main; Windows only on the full runs.
+        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-2022"]') }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Set the compiler
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "CC=cl" >> "$GITHUB_ENV"; echo "CXX=cl" >> "$GITHUB_ENV"
+          else
+            echo "CC=gcc" >> "$GITHUB_ENV"; echo "CXX=g++" >> "$GITHUB_ENV"
+          fi
+      - name: Install Ninja
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: godot-${{ matrix.os }}
+          max-size: 500M
+      - uses: actions/cache@v4
+        with:
+          # The downloaded sources only; the dependency builds come from ccache.
+          path: |
+            build/godot/_deps
+            !build/godot/_deps/*-build
+          key: fetchcontent-godot-${{ matrix.os }}-${{ hashFiles('cmake/ZtripDependencies.cmake', 'tests/CMakeLists.txt', 'hosts/godot/CMakeLists.txt') }}
+      - name: Configure
+        run: cmake --preset godot -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
       - name: Build
         run: cmake --build --preset godot
       - name: Test core
@@ -112,6 +147,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ztrip-godot-${{ runner.os }}
+          retention-days: 7
           path: |
             hosts/godot/project
             !hosts/godot/project/.godot
