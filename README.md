@@ -1,25 +1,44 @@
 # ztrip
 
-Music-reactive animation engine (`ztrip`): an engine-agnostic C++20 core that turns audio and live inputs into animation, with Godot 4 and Unreal Engine 5.6+ hosts planned.
+ztrip animates things from music. Point it at a song and it works out the beat, the bars, and when the kick, snare, bass and cymbals hit. A small node graph then turns those signals into motion: lights that flash on the kick, a camera that pushes in on the bass, materials that pulse with the hi-hats. No per-beat keyframing, and scrubbing back and forth through the song always gives the same result.
 
-Status: Phase 1 (offline audio analysis) and Phase 2 (Motion Graph core: compiler, evaluator, 15 nodes, `.mgraph.json`) are in. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/NODES.md](docs/NODES.md).
+Under the hood it is an engine-agnostic C++20 core with a Godot 4 host in progress and an Unreal Engine 5.6+ host planned.
+
+**Beta testers:** start with [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
+
+## Status
+
+| Part | State |
+| --- | --- |
+| Audio analysis: bands, envelopes, onsets, tempo, beat grid, `analyze-cli` | Done |
+| Motion Graph core: compiler, evaluator, 15 nodes, `.mgraph.json` | Done |
+| Godot 4 addon: property binder, graph editor, song playback | In progress |
+| Musical time: tempo map, note lanes, timeline | In progress |
+| Live input: mic, MIDI, OSC, DMX | After beta |
+| Unreal Engine plugin | After beta |
+
+Platforms: Windows 11 and Linux.
 
 ## Build
 
+Requires CMake 3.24+, Ninja and a C++20 compiler (GCC 13+, Clang 16+ or MSVC 2022). Dependencies are fetched at configure time. Step-by-step instructions for each platform are in [GETTING_STARTED.md](docs/GETTING_STARTED.md#build-from-source).
+
 ```sh
-cmake --preset dev
-cmake --build --preset dev
-ctest --preset dev
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
 ```
+
+Use the `dev` preset for a Debug build in `build/dev`.
 
 ## Analyse a track
 
 ```sh
-build/dev/tools/analyze-cli/analyze-cli song.wav -o song-analysis
+build/release/tools/analyze-cli/analyze-cli song.wav -o song-analysis
 python3 song-analysis/plot.py --start 30 --end 45   # needs numpy + matplotlib
 ```
 
-This writes a `.sigcache`, CSVs of the 120 Hz band levels, envelopes, onsets and beat grid, and a plot script. `analyze-cli --help` lists the tuning options (FFT size, window, attack/release, onset sensitivity, tempo prior).
+This writes a `.sigcache`, CSVs of the 120 Hz band levels, envelopes, onsets and beat grid, and a plot script. `analyze-cli --help` lists the tuning options (FFT size, window, attack/release, onset sensitivity, tempo prior). [GETTING_STARTED.md](docs/GETTING_STARTED.md#analyse-a-song) explains how to read the output.
 
 Accuracy tests against the reference tracks run when `ZTRIP_REFERENCE_TRACKS` points at a folder holding them; otherwise they are skipped.
 
@@ -33,3 +52,14 @@ ev.bind_source("main", &analysis);                   // an analysis::AnalysisRes
 ev.evaluate(t);                                      // any time, any order: seeking is deterministic
 for (const auto& o : ev.outputs()) set_property(o.target, o.value);
 ```
+
+## Documentation
+
+- [GETTING_STARTED.md](docs/GETTING_STARTED.md): build, analyse a song, report problems
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): data flow, analysis pipeline, graph evaluation, file formats
+- [NODES.md](docs/NODES.md): Motion Graph node reference
+- [DECISIONS.md](docs/DECISIONS.md): design decisions and why
+
+## Feedback
+
+Bugs and questions go to [GitHub issues](https://github.com/zedhand/ztrip/issues).
