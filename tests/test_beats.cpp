@@ -48,3 +48,37 @@ TEST_CASE("tempo estimate is 0 for signals too short to judge", "[beats]") {
     CHECK(estimate_tempo(o, 100.0, {}) == 0.0);
     CHECK(track_beats(o, 100.0, 0.0, {}).empty());
 }
+
+TEST_CASE("drum_fit scores beats on the hits, not between them", "[beats]") {
+    std::vector<double> beats;
+    std::vector<Trigger> on, between;
+    for (int i = 0; i < 16; ++i) {
+        beats.push_back(0.5 * i);
+        on.push_back({0.5 * i + 0.01, 1.0f});
+        between.push_back({0.5 * i + 0.25, 1.0f});
+    }
+    CHECK(drum_fit(beats, on).f == Catch::Approx(1.0));
+    CHECK(drum_fit(beats, between).f == 0.0);
+    CHECK(drum_fit(beats, {}).f == 0.0);
+}
+
+TEST_CASE("a fast rock groove is read at the drummer's tempo, not half of it", "[beats]") {
+    // 200 BPM: kick on 1 and 3, snare on 2 and 4, hats on every beat. The
+    // onset autocorrelation and the 120 BPM prior favour 100 BPM (kick and
+    // snare as one pulse); the drum hits fit 200 better.
+    const int sr = 44100;
+    const double bpm = 200.0;
+    const double spb = 60.0 / bpm;
+    const int beats = 160;
+    std::vector<float> x(static_cast<std::size_t>((beats * spb + 1.0) * sr), 0.0f);
+    ztrip::test::Noise noise(7);
+    for (int b = 0; b < beats; ++b) {
+        const double t = 0.3 + b * spb;
+        if (b % 2 == 0) ztrip::test::add_kick(x, sr, t, 0.8f);
+        else ztrip::test::add_snare(x, sr, t, noise, 0.6f);
+        ztrip::test::add_hat(x, sr, t, noise);
+    }
+    const auto grid = analyze(x, sr, {}).beats;
+    INFO("-> " << grid.bpm << " BPM");
+    CHECK(grid.bpm == Catch::Approx(bpm).epsilon(0.01));
+}
