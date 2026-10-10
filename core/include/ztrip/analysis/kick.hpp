@@ -12,7 +12,7 @@ struct KickSettings {
     float window_ms = 10.0f;   // centred energy window
     float hop_ms = 2.5f;       // envelope step
     float lag_ms = 10.0f;      // a rise is measured over this span
-    float min_rise_db = 9.0f;  // smallest level jump that counts as a kick
+    float min_rise_db = 12.0f; // smallest level jump that counts as a kick
     float gate_db = 20.0f;     // the hit must peak within this much of the loud low end
     float range_db = 60.0f;    // levels below (loud low end - range) are treated as silence
     float min_gap_s = 0.05f;   // minimum time between kicks
