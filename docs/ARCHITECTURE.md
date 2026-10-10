@@ -146,6 +146,17 @@ Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of
 
 On reference track 01, live `onset.Sub` (velocity 0.3 or more) finds 99% of the kicks with 100% precision, 12 ms late on average and 15 ms at worst; `onset.Air` finds every hat within 18 ms.
 
+## Live controls (Phase 5)
+
+MIDI, OSC and DMX share one model: named controls with a value history and triggers (`io::ControlSet`).
+
+- **Names:** `midi/<channel>/note/<n>`, `midi/<channel>/cc/<n>`, `midi/<channel>/pitchbend` (each MIDI message is also recorded under channel 0, "any"), `osc<address>` (first argument; further ones as `osc<address>/<k>`), `dmx/<universe>/<channel>`.
+- **Inputs:** `io::MidiInput` (RtMidi: ALSA on Linux, Windows MM), `io::OscInput` (UDP, messages and bundles), `io::DmxInput` (Art-Net ArtDmx or sACN E1.31 over UDP, own parsers; only changed channels are passed on). Each receives on its own thread into an SPSC ring of fixed-size `ControlMessage`s; `update(controls, stamp)` records them on the evaluating thread.
+- **Timing:** input is stamped with `Evaluator::stamp_time(t)`, the tick the next evaluate reaches (or the next unevaluated tick), so it shows on the next frame and no trigger lands on a tick already passed. In a 60 fps loop, an Art-Net packet reaches a graph output about 18 ms after it is sent (test: "a fader over Art-Net and an OSC message reach the graph within 30 ms").
+- **History:** a control keeps every change, so evaluation is still a function of time and a seek plays back what controls did; new input after a seek back replaces that control's later history.
+- **Macros:** a `ControlBinding` maps a control onto a macro's range; `ControlLearn` binds the next control that moves. Bindings save as `*.controls.json` controller profiles (`serialize::load_controls` / `save_controls`).
+- **Nodes:** `MidiNote`, `MidiCC`, `OscValue`, `DmxChannel` (see [NODES.md](NODES.md)).
+
 ## Persisted formats
 
 All JSON formats are versioned and carry migrations.

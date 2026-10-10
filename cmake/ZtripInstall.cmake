@@ -20,7 +20,7 @@ if(TARGET ztrip_analyze)
   endif()
 endif()
 
-install(TARGETS ztrip_core ztrip_pffft ztrip_miniaudio EXPORT ztripTargets
+install(TARGETS ztrip_core ztrip_pffft ztrip_miniaudio ztrip_rtmidi EXPORT ztripTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT sdk)
 install(DIRECTORY core/include/ztrip
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT sdk)
@@ -45,7 +45,7 @@ install(FILES README.md packaging/BETA.md
   DESTINATION . COMPONENT docs)
 install(DIRECTORY docs/ DESTINATION docs COMPONENT docs)
 install(DIRECTORY examples/ DESTINATION examples COMPONENT docs)
-# pffft and miniaudio are compiled into the library and nlohmann/json into its
+# pffft, miniaudio and RtMidi are compiled into the library and nlohmann/json into its
 # .mgraph.json code, so their licenses ship with every archive.
 install(FILES "${pffft_SOURCE_DIR}/LICENSE.txt"
   DESTINATION licenses RENAME pffft-LICENSE.txt COMPONENT docs)
@@ -53,6 +53,8 @@ install(FILES "${nlohmann_json_SOURCE_DIR}/LICENSE.MIT"
   DESTINATION licenses RENAME nlohmann_json-LICENSE.txt COMPONENT docs)
 install(FILES "${miniaudio_SOURCE_DIR}/LICENSE"
   DESTINATION licenses RENAME miniaudio-LICENSE.txt COMPONENT docs)
+install(FILES "${rtmidi_SOURCE_DIR}/LICENSE"
+  DESTINATION licenses RENAME rtmidi-LICENSE.txt COMPONENT docs)
 
 if(TARGET ztrip_godot)
   # The demo project with the built addon inside, ready to open in Godot.

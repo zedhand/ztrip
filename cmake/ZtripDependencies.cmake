@@ -55,3 +55,31 @@ if(UNIX AND NOT APPLE)
   target_link_libraries(ztrip_miniaudio PUBLIC m)
 endif()
 set_target_properties(ztrip_miniaudio PROPERTIES POSITION_INDEPENDENT_CODE ON EXPORT_NAME miniaudio)
+
+# RtMidi: MIDI input (Phase 5), with ALSA on Linux and Windows MM on Windows.
+# Without the ALSA headers (libasound2-dev) it builds with no MIDI backend,
+# and MIDI input reports that no ports exist.
+FetchContent_Declare(rtmidi
+  GIT_REPOSITORY https://github.com/thestk/rtmidi.git
+  GIT_TAG        6.0.0
+  GIT_SHALLOW    TRUE
+  SOURCE_SUBDIR  ztrip-no-cmake
+)
+FetchContent_MakeAvailable(rtmidi)
+
+add_library(ztrip_rtmidi STATIC ${rtmidi_SOURCE_DIR}/RtMidi.cpp)
+target_include_directories(ztrip_rtmidi PUBLIC $<BUILD_INTERFACE:${rtmidi_SOURCE_DIR}>)
+if(WIN32)
+  target_compile_definitions(ztrip_rtmidi PRIVATE __WINDOWS_MM__)
+  target_link_libraries(ztrip_rtmidi PUBLIC winmm)
+else()
+  find_package(ALSA)
+  if(ALSA_FOUND)
+    target_compile_definitions(ztrip_rtmidi PRIVATE __LINUX_ALSA__)
+    target_link_libraries(ztrip_rtmidi PUBLIC ALSA::ALSA Threads::Threads)
+  else()
+    message(WARNING "ALSA headers not found (install libasound2-dev): building without MIDI input")
+    target_compile_definitions(ztrip_rtmidi PRIVATE __RTMIDI_DUMMY__)
+  endif()
+endif()
+set_target_properties(ztrip_rtmidi PROPERTIES POSITION_INDEPENDENT_CODE ON EXPORT_NAME rtmidi)

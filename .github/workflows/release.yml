@@ -52,7 +52,7 @@ jobs:
         if: runner.os == 'Windows'
       - name: Install toolchain
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build g++-12
+        run: sudo apt-get update && sudo apt-get install -y ninja-build g++-12 libasound2-dev
       - name: Configure
         run: >
           cmake --preset release

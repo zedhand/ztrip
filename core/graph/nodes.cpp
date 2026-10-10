@@ -1,6 +1,7 @@
 // The v1 essential node catalog. See docs/NODES.md for the reference.
 #include "ztrip/analysis/offline.hpp"
 #include "ztrip/graph/registry.hpp"
+#include "ztrip/io/controls.hpp"
 #include "ztrip/time/note_sequence.hpp"
 #include "ztrip/time/tempo_map.hpp"
 
@@ -195,6 +196,92 @@ private:
     std::string slot_, sequence_slot_, lane_;
     time::TempoMap fallback_;
     time::LaneTimeline timeline_;
+};
+
+// Base of the live control sources: reads one named control from the
+// ControlSet bound to the node's slot. Controls can appear after binding (a
+// fader first moved mid-show), so the name is looked up each tick.
+class ControlNode : public Node {
+public:
+    ControlNode(const NodeSetup& s, std::string name) : slot_(s.string("source")), name_(std::move(name)) {}
+    void bind(const SourceSet& sources) override { controls_ = sources.find_controls(slot_); }
+
+protected:
+    const io::Control* control() const { return controls_ ? controls_->find(name_) : nullptr; }
+    static Value fired(const io::Control& c, const EvalContext& ctx) { return events_in_tick(c.triggers, ctx); }
+
+    std::string slot_, name_;
+    const io::ControlSet* controls_ = nullptr;
+};
+
+std::string midi_channel(const NodeSetup& s) {
+    return std::to_string(std::clamp(static_cast<int>(std::lround(s.number("channel"))), 0, 16));
+}
+std::string midi_number(const NodeSetup& s, std::string_view param) {
+    return std::to_string(std::clamp(static_cast<int>(std::lround(s.number(param))), 0, 127));
+}
+
+class MidiNoteNode final : public ControlNode {
+public:
+    explicit MidiNoteNode(const NodeSetup& s)
+        : ControlNode(s, "midi/" + midi_channel(s) + "/note/" + midi_number(s, "note")) {}
+    void evaluate(const EvalContext& ctx, NodeIO& io) const override {
+        enum { kGate, kTrigger, kVelocity };
+        const io::Control* c = control();
+        if (!c) return;
+        const double v = c->value_at(ctx.time);
+        io.out[kGate].v = v > 0.0 ? 1.0 : 0.0;
+        io.out[kTrigger] = fired(*c, ctx);
+        io.out[kVelocity].v = v;
+    }
+};
+
+class MidiCcNode final : public ControlNode {
+public:
+    explicit MidiCcNode(const NodeSetup& s) : ControlNode(s, "midi/" + midi_channel(s) + "/cc/" + midi_number(s, "cc")) {}
+    void evaluate(const EvalContext& ctx, NodeIO& io) const override {
+        if (const io::Control* c = control()) io.out[0].v = c->value_at(ctx.time);
+    }
+};
+
+class OscValueNode final : public ControlNode {
+public:
+    explicit OscValueNode(const NodeSetup& s) : ControlNode(s, "osc" + s.string("address")) {}
+    void evaluate(const EvalContext& ctx, NodeIO& io) const override {
+        const io::Control* c = control();
+        if (!c) return;
+        io.out[0].v = c->value_at(ctx.time);
+        io.out[1] = fired(*c, ctx);
+        // An OSC trigger carries the message's value; keep it in 0..1.
+        io.out[1].v = clamp01(io.out[1].v);
+    }
+};
+
+class DmxChannelNode final : public ControlNode {
+public:
+    explicit DmxChannelNode(const NodeSetup& s)
+        : ControlNode(s, name(s, 0)), fine_name_(s.boolean("fine") ? name(s, 1) : std::string()) {}
+    void evaluate(const EvalContext& ctx, NodeIO& io) const override {
+        const io::Control* c = control();
+        if (!c) return;
+        const double coarse = c->value_at(ctx.time);
+        if (fine_name_.empty()) {
+            io.out[0].v = coarse;
+            return;
+        }
+        // 16-bit: this channel is the high byte, the next one the low byte.
+        const io::Control* f = controls_ ? controls_->find(fine_name_) : nullptr;
+        const double fine = f ? f->value_at(ctx.time) : 0.0;
+        io.out[0].v = (std::round(coarse * 255.0) * 256.0 + std::round(fine * 255.0)) / 65535.0;
+    }
+
+private:
+    static std::string name(const NodeSetup& s, int offset) {
+        const int channel = std::clamp(static_cast<int>(std::lround(s.number("channel"))), 1, 512) + offset;
+        return "dmx/" + std::to_string(std::max(0, static_cast<int>(std::lround(s.number("universe"))))) + "/" +
+               std::to_string(channel);
+    }
+    std::string fine_name_;
 };
 
 class ConstantNode final : public Node {
@@ -472,6 +559,22 @@ void register_builtin_nodes(NodeRegistry& r) {
                 {"velocity", C::Continuous}},
            {text("source", "main"), text("sequence", "main"), text("lane", "Kick")},
            0, false, factory<NoteLaneNode>()});
+    r.add({"MidiNote", "Sources", "Gate, trigger and velocity of a MIDI note (channel 0 = any channel).",
+           {}, {{"gate", C::Continuous}, {"trigger", C::Trigger}, {"velocity", C::Continuous}},
+           {text("source", "main"), number("channel", 0.0), number("note", 36.0)},
+           0, false, factory<MidiNoteNode>()});
+    r.add({"MidiCC", "Sources", "A MIDI control change as 0-1 (channel 0 = any channel).",
+           {}, {{"out", C::Continuous}},
+           {text("source", "main"), number("channel", 0.0), number("cc", 1.0)},
+           0, false, factory<MidiCcNode>()});
+    r.add({"OscValue", "Sources", "The first argument of OSC messages to an address, and a trigger per message.",
+           {}, {{"out", C::Continuous}, {"trigger", C::Trigger}},
+           {text("source", "main"), text("address", "/fader/1")},
+           0, false, factory<OscValueNode>()});
+    r.add({"DmxChannel", "Sources", "A DMX channel (Art-Net or sACN) as 0-1, optionally 16-bit with the next channel.",
+           {}, {{"out", C::Continuous}},
+           {text("source", "main"), number("universe", 0.0), number("channel", 1.0), boolean("fine", false)},
+           0, false, factory<DmxChannelNode>()});
     r.add({"Constant", "Sources", "A fixed value.", {}, {{"out", C::Continuous}}, {number("value", 0.0)},
            0, false, factory<ConstantNode>()});
 

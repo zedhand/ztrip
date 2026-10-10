@@ -7,6 +7,9 @@
 
 #include "ztrip/graph/evaluator.hpp"
 #include "ztrip/io/audio_capture.hpp"
+#include "ztrip/io/controls.hpp"
+#include "ztrip/io/midi.hpp"
+#include "ztrip/io/network.hpp"
 
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/templates/list.hpp>
@@ -31,6 +34,11 @@ namespace godot {
 // song: a microphone, what the computer plays (live_loopback), or a WAV file
 // played in real time (live_simulate_file). Capture runs while playing, so
 // the microphone is only opened on play() (or autoplay).
+//
+// MIDI, OSC and DMX (Art-Net or sACN) inputs feed the graph's MidiNote,
+// MidiCC, OscValue and DmxChannel nodes, and can drive macros through
+// control bindings, made by hand or by learn_macro() (move a control and it
+// is bound). Bindings save with the scene and as *.controls.json profiles.
 //
 // The player also holds the song's timeline (tempo map and Note Sequence,
 // see ZtripTimeline), which the graph's BeatClock and NoteLane nodes read.
@@ -82,6 +90,39 @@ public:
     bool is_live_running() const { return live_ != nullptr; }
     // Capture devices: an array of {name, default, loopback} dictionaries.
     static Array get_live_devices();
+
+    void set_midi_input(bool on);
+    bool is_midi_input() const { return midi_input_; }
+    void set_midi_port(const String& port);
+    String get_midi_port() const { return midi_port_; }
+    void set_osc_input(bool on);
+    bool is_osc_input() const { return osc_input_; }
+    void set_osc_port(int port);
+    int get_osc_port() const { return osc_port_; }
+    void set_dmx_input(int protocol); // 0 off, 1 Art-Net, 2 sACN
+    int get_dmx_input() const { return dmx_input_; }
+    void set_dmx_port(int port);
+    int get_dmx_port() const { return dmx_port_; }
+    void set_dmx_universes(const PackedInt32Array& universes);
+    PackedInt32Array get_dmx_universes() const { return dmx_universes_; }
+    static PackedStringArray get_midi_ports();
+
+    // Bindings as an array of {macro, control, min, max} dictionaries.
+    void set_control_bindings(const Array& bindings);
+    Array get_control_bindings() const;
+    void bind_control(const String& macro, const String& control, double min, double max);
+    void unbind_control(const String& macro);
+    // Binds the next control that moves to the macro, over the macro's range.
+    void learn_macro(const String& macro);
+    void cancel_learn();
+    bool is_learning() const { return learn_.armed(); }
+    Error load_controls(const String& path);
+    Error save_controls(const String& path) const;
+    // A control's current value (0 if it never moved), and the names seen so far.
+    double get_control_value(const String& control) const;
+    PackedStringArray get_control_names() const;
+    // Records a control change as if it came from a device (scripts, tests).
+    void inject_control(const String& control, double value, bool fire);
 
     void play(double from = -1.0);
     void stop();
@@ -145,6 +186,8 @@ private:
     void stop_live();
     void restart_live();
     void rebuild_evaluator();
+    void restart_control_inputs();
+    void update_controls();
     const ztrip::analysis::AnalysisResult* main_source() const;
 
     NodePath audio_player_;
@@ -191,6 +234,22 @@ private:
     double live_gain_db_ = 0.0;
     std::unique_ptr<ztrip::io::LiveAudioInput> live_;
     String live_error_;
+
+    bool midi_input_ = false;
+    String midi_port_;
+    bool osc_input_ = false;
+    int osc_port_ = 9000;
+    int dmx_input_ = 0;
+    int dmx_port_ = 0;
+    PackedInt32Array dmx_universes_;
+    ztrip::io::ControlSet controls_;
+    std::unique_ptr<ztrip::io::MidiInput> midi_;
+    std::unique_ptr<ztrip::io::OscInput> osc_;
+    std::unique_ptr<ztrip::io::DmxInput> dmx_;
+    std::vector<ztrip::io::ControlBinding> bindings_;
+    std::map<std::string, double> binding_values_; // last value each binding gave its macro
+    ztrip::io::ControlLearn learn_;
+    PackedStringArray control_errors_;
 };
 
 } // namespace godot

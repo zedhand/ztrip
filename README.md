@@ -16,7 +16,7 @@ Under the hood it is an engine-agnostic C++20 core with a Godot 4 addon and an U
 | Musical time core: tempo map, Note Sequences, auto-drafted kick lane, `NoteLane` node | Done |
 | Musical time: Timeline panel in Godot (tempo map, note lanes, draw, nudge, save) | Done (beta) |
 | Live audio input: microphone, loopback, `live-cli`, Godot `live_input` | Done (beta stretch) |
-| Live input: MIDI, OSC, DMX | In progress |
+| Live control input: MIDI, OSC, DMX (Art-Net, sACN), learn, controller profiles | Done (beta stretch) |
 | Unreal Engine plugin | After beta |
 
 Platforms: Windows 11 and Linux.
