@@ -103,9 +103,13 @@ AnalysisResult analyze(std::span<const float> mono, int sample_rate, const Analy
     r.events.push_back({"kick", detect_kicks(mono, sample_rate, settings.kick)});
 
     // Beat tracking listens to the default bands with equal weight, so the
-    // many high-frequency bins (hats) don't outvote the kick and snare.
+    // many high-frequency bins (hats) don't outvote the kick and snare. Sub
+    // is left out: at common FFT sizes it spans one or two bins and sees a
+    // kick only as its pitch sweeps down, tens of ms late, which pulled the
+    // beat phase around on live material.
     std::vector<float> beat_strength(spec.frames, 0.0f);
     for (const Band& band : default_bands()) {
+        if (band.low_hz < 60.0f) continue;
         const std::vector<float> flux = band_flux(spec, band);
         const float scale = std::max(percentile(flux, 99.0f), settings.onsets.min_scale);
         for (std::size_t f = 0; f < spec.frames; ++f) beat_strength[f] += flux[f] / scale;
