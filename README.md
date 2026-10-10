@@ -59,6 +59,7 @@ for (const auto& o : ev.outputs()) set_property(o.target, o.value);
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): data flow, analysis pipeline, graph evaluation, file formats
 - [NODES.md](docs/NODES.md): Motion Graph node reference
 - [DECISIONS.md](docs/DECISIONS.md): design decisions and why
+- [RELEASING.md](docs/RELEASING.md): versioning, beta downloads and cutting a release
 
 ## Feedback
 
