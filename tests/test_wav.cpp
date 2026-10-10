@@ -2,6 +2,7 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <cstring>
 #include <stdexcept>
@@ -122,4 +123,14 @@ TEST_CASE("malformed and unsupported files are rejected", "[wav]") {
     auto truncated = make_wav(1, 1, 16, {0, 0});
     truncated.resize(20);
     CHECK_THROWS_AS(parse_wav(truncated), std::runtime_error);
+}
+
+TEST_CASE("other audio formats are named in the error, with how to convert", "[wav]") {
+    using Catch::Matchers::ContainsSubstring;
+    const std::vector<std::uint8_t> mp3 = {'I', 'D', '3', 4, 0, 0, 0, 0, 0, 0, 0, 0};
+    const std::vector<std::uint8_t> flac = {'f', 'L', 'a', 'C', 0, 0, 0, 34, 0, 0, 0, 0};
+    CHECK_THROWS_WITH(parse_wav(mp3), ContainsSubstring("MP3") && ContainsSubstring("ffmpeg"));
+    CHECK_THROWS_WITH(parse_wav(flac), ContainsSubstring("FLAC"));
+    const std::vector<std::uint8_t> junk = {'n', 'o', 'p', 'e'};
+    CHECK_THROWS_WITH(parse_wav(junk), ContainsSubstring("not a RIFF/WAVE file"));
 }
