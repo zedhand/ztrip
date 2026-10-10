@@ -15,12 +15,25 @@ same minor version.
 
 | Archive | Built on |
 | --- | --- |
-| `ztrip-<version>-linux-x86_64.tar.gz` | Ubuntu 22.04, GCC 12, libstdc++ linked statically into `analyze-cli` |
+| `ztrip-<version>-linux-x86_64.tar.gz` | Ubuntu 22.04, GCC 12, libstdc++ linked statically into `analyze-cli` and the Godot addon |
 | `ztrip-<version>-windows-x64.zip` | Windows Server 2022, MSVC, runtime DLLs bundled next to `analyze-cli.exe` |
 
+Both hold the CLI, the SDK, the docs and the Godot demo project with the
+built addon in `godot/`.
+
+The addon has its own build tree (`build/godot-addon`, from the `godot`
+preset with tools and tests off). With the Godot host on, MSVC uses the
+static runtime that godot-cpp needs, and an SDK library built that way would
+no longer link into ordinary `/MD` consumer projects. So the SDK and CLI come
+from the `release` build, and `ZTRIP_PACKAGE_GODOT_BUILD_DIR` tells its CPack
+config to take only the `godot` component from the addon's tree.
+
 Each archive is extracted and checked before upload: `analyze-cli --version`
-must print the version, and a small CMake project
-(`tests/package-consumer/`) must build and run against the installed library.
+must print the version, a small CMake project (`tests/package-consumer/`)
+must build and run against the installed library, and the archive's Godot
+project must import and pass the host tests (`hosts/godot/project/tests/`,
+copied in for the check, not shipped) in Godot 4.5.1, the oldest supported
+version.
 
 The workflow runs on:
 
@@ -31,20 +44,21 @@ The workflow runs on:
   workflow artifacts only.
 - pull requests that touch the build or packaging files: same as dispatch.
 
-To build an archive locally:
+To build an archive locally the way the workflow does (on Linux, the
+workflow also passes `-static-libstdc++ -static-libgcc` as linker flags; on
+Windows, run this in the x64 Native Tools prompt):
 
 ```sh
-cmake --preset release
+cmake --preset godot -B build/godot-addon -DZTRIP_BUILD_TOOLS=OFF -DZTRIP_BUILD_TESTS=OFF
+cmake --build build/godot-addon --target ztrip_godot
+cmake --preset release -DZTRIP_PACKAGE_GODOT_BUILD_DIR=$PWD/build/godot-addon
 cmake --build --preset release
 cpack --config build/release/CPackConfig.cmake -B build/release/packages
 ```
 
-The `godot` preset builds the same archive plus a `godot/` folder holding the
-demo project with the built addon (the `godot` component). The release
-workflow still uses the `release` preset: with the Godot host on, MSVC builds
-use the static runtime that godot-cpp needs, and the SDK library would then
-no longer link into ordinary `/MD` consumer projects. Until the addon gets its
-own build in the workflow, CI uploads it as the `ztrip-godot-*` artifacts.
+Leave out the first two lines and the `-D` option for an archive without
+`godot/`. Note the addon library is written into the source tree
+(`hosts/godot/project/addons/ztrip/bin/`) and packaged from there.
 
 ## Cutting a release
 

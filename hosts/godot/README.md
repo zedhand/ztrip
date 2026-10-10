@@ -9,7 +9,10 @@ x86_64.
 
 ## Build
 
-From the repository root:
+The release downloads (see the
+[Releases page](https://github.com/zedhand/ztrip/releases)) include this
+project with the addon already built, as their `godot/` folder. To build it
+yourself, from the repository root:
 
 ```sh
 cmake --preset godot

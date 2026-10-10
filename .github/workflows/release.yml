@@ -1,8 +1,8 @@
 name: Release
 
-# Builds the Windows and Linux beta archives. On a pushed v* tag it also
-# creates a draft GitHub release with them; publishing stays a manual step.
-# See docs/RELEASING.md.
+# Builds the Windows and Linux beta archives, each with the Godot addon and
+# demo project. On a pushed v* tag it also creates a draft GitHub release with
+# them; publishing stays a manual step. See docs/RELEASING.md.
 on:
   push:
     tags: ['v*']
@@ -14,6 +14,7 @@ on:
       - CMakePresets.json
       - cmake/**
       - packaging/**
+      - hosts/godot/**
       - tests/package-consumer/**
       - '**/CMakeLists.txt'
 
@@ -37,11 +38,13 @@ jobs:
             cc: gcc-12
             cxx: g++-12
             ldflags: -static-libstdc++ -static-libgcc
+            godot: Godot_v4.5.1-stable_linux.x86_64
           - platform: windows-x64
             os: windows-2022
             cc: cl
             cxx: cl
             ldflags: ''
+            godot: Godot_v4.5.1-stable_win64
     runs-on: ${{ matrix.os }}
     env:
       CC: ${{ matrix.cc }}
@@ -53,10 +56,20 @@ jobs:
       - name: Install toolchain
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ninja-build g++-12 libasound2-dev
+      # The addon gets its own build tree: ZTRIP_BUILD_GODOT puts MSVC on the
+      # static runtime, which the SDK library in the archive must not use.
+      # Only its godot component goes into the archive.
+      - name: Build the Godot addon
+        run: >
+          cmake --preset godot -B build/godot-addon
+          -DZTRIP_BUILD_TOOLS=OFF -DZTRIP_BUILD_TESTS=OFF
+          "-DCMAKE_SHARED_LINKER_FLAGS=${{ matrix.ldflags }}"
+          && cmake --build build/godot-addon --target ztrip_godot
       - name: Configure
         run: >
           cmake --preset release
           -DZTRIP_PACKAGE_PLATFORM=${{ matrix.platform }}
+          "-DZTRIP_PACKAGE_GODOT_BUILD_DIR=${{ github.workspace }}/build/godot-addon"
           "-DCMAKE_EXE_LINKER_FLAGS=${{ matrix.ldflags }}"
       - name: Check tag matches version
         if: startsWith(github.ref, 'refs/tags/v')
@@ -95,6 +108,29 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=${root}"
           cmake --build build/consumer
           build/consumer/consumer "${root}/examples/kick_to_light.mgraph.json"
+
+          # The addon must load from the archive and pass the host tests in the
+          # oldest supported Godot. The tests aren't shipped, so run them from
+          # a copy of the archive's project.
+          test -f "${root}/godot/project.godot"
+          ls "${root}/godot/addons/ztrip/bin"
+          if ls "${root}"/godot/addons/ztrip/bin/*.lib "${root}"/godot/addons/ztrip/bin/*.exp 2>/dev/null; then
+            echo "::error::Linker leftovers in the Godot addon"; exit 1
+          fi
+          cp -r "${root}/godot" build/godot-check
+          cp -r hosts/godot/project/tests build/godot-check/
+          godot_zip="${{ matrix.godot }}.zip"
+          [ "$RUNNER_OS" = "Windows" ] && godot_zip="${{ matrix.godot }}.exe.zip"
+          curl -sSfL -o "$RUNNER_TEMP/godot.zip" \
+            "https://github.com/godotengine/godot/releases/download/4.5.1-stable/${godot_zip}"
+          unzip -q -o "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot"
+          godot="$RUNNER_TEMP/godot/${{ matrix.godot }}"
+          [ "$RUNNER_OS" = "Windows" ] && godot="$RUNNER_TEMP/godot/${{ matrix.godot }}_console.exe"
+          # Godot 4.5.1 can crash on exit after a first import with a
+          # GDExtension loaded; the import itself completes, so check that.
+          "$godot" --headless --path build/godot-check --import || true
+          test -f build/godot-check/.godot/extension_list.cfg
+          "$godot" --headless --path build/godot-check -s res://tests/test_host.gd
 
           echo "ARCHIVE=${archive}" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
