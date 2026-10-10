@@ -31,6 +31,7 @@ hosts/           (later phases)
   godot/         GDExtension + editor plugin, timeline dock, binder
 tools/
   analyze-cli/   offline analysis + plot dump for tuning
+examples/        sample .mgraph.json graphs
 tests/           unit, determinism and analysis accuracy tests (Catch2)
 docs/            ARCHITECTURE.md, DECISIONS.md, node reference
 ```
@@ -47,7 +48,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Options: `ZTRIP_BUILD_TOOLS` and `ZTRIP_BUILD_TESTS` (both `ON` by default). Catch2 is fetched at configure time unless an installed Catch2 3.x is found; pffft (v1.1.0, the FFT) is always fetched and only its float FFT sources are compiled.
+Options: `ZTRIP_BUILD_TOOLS` and `ZTRIP_BUILD_TESTS` (both `ON` by default). Catch2 is fetched at configure time unless an installed Catch2 3.x is found; pffft (v1.1.0, the FFT) is always fetched and only its float FFT sources are compiled; nlohmann/json (3.11.3) is fetched unless an installed 3.11+ is found.
 
 ## Threading
 
@@ -92,6 +93,20 @@ Offline buffers are pure functions of the file and settings, so `AnalysisResult:
 ### `.sigcache` format
 
 Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of the decoded audio and of every analysis setting (plus a pipeline version), then signal rate, duration, BPM, beats per bar, downbeat phase, the named signal buffers (f32), the named event lists (f64 time, f32 velocity) and the beat and downbeat times. A cache is reused only when both hashes match; malformed or stale files are ignored and regenerated. See `core/include/ztrip/serialize/sigcache.hpp`.
+
+## Motion Graph core (Phase 2)
+
+`ztrip::graph` turns a `.mgraph.json` document into per-tick values for host properties.
+
+1. **Document:** `serialize::load_mgraph` / `parse_mgraph` read a `GraphDoc` (nodes with typed params, `node.port` edges, macros); `write_mgraph` writes it back with a stable key order. Versioned, with a migration table for future versions; newer files are rejected.
+2. **Registry:** `NodeRegistry::builtin()` holds the 15 essential nodes (see [NODES.md](NODES.md)). A node type declares typed ports, params and how many doubles of state it keeps.
+3. **Compile:** `graph::compile` validates ids, types, params, edges and port types, rejects cycles, topo-sorts (ties keep document order), lays out one value array for all outputs and one state array for all nodes, and applies macro defaults. All problems come back as diagnostics, not exceptions.
+4. **Evaluate:** `graph::Evaluator` steps the compiled graph on a fixed 120 Hz tick grid, whatever the host frame rate: `evaluate(t)` runs ticks up to `floor(t * 120)`. Nodes are const and may carry information between ticks only in their slice of the state array. Source nodes read analysis through named slots (`bind_source`), so repointing a song or stem is a rebind.
+5. **Seeking:** while playing, the state array is checkpointed every second (state before tick `k`). A seek restores the latest checkpoint at or before the target and replays, so seek and play run the same ticks and agree exactly; the tests require 1e-5. Changing a macro, a binding or the graph clears checkpoints: playing continues from the current state, while a seek, or re-evaluating the current time, replays with the new settings.
+6. **Hot swap:** `swap_graph` keeps the state and port values of nodes whose id and type persist, and macro values whose name persists.
+7. **Live mode:** the same nodes with `live` set, no checkpoints; a backwards jump resets state instead of replaying.
+
+`Evaluator::outputs()` lists each `PropertyOut` target and value; `port_value(node, port)` reads any port for previews.
 
 ## Persisted formats
 
