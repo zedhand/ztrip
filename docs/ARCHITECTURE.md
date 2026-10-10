@@ -1,6 +1,6 @@
 # Architecture
 
-`mre` (working name, "music-reactive engine") animates scene properties from music. All logic lives in one C++20 core library with no engine headers. The Godot 4 app and the Unreal Engine 5.6+ plugin are thin hosts that supply UI, a timeline, a property binder and rendering. A `.mgraph.json` saved in one host must load and behave identically in the other.
+`ztrip`, a music-reactive animation engine, animates scene properties from music. All logic lives in one C++20 core library with no engine headers. The Godot 4 app and the Unreal Engine 5.6+ plugin are thin hosts that supply UI, a timeline, a property binder and rendering. A `.mgraph.json` saved in one host must load and behave identically in the other.
 
 ## Data flow
 
@@ -19,7 +19,7 @@ Inputs -> Input adapters -> Analysis -> Musical time -> Motion Graph -> Host bin
 
 ```text
 core/            C++20 library, no engine headers
-  include/mre/   public headers
+  include/ztrip/   public headers
   src/           shared implementation
   analysis/      STFT, bands, onsets, beat tracking, stems (onnx)
   graph/         node registry, compiler, evaluator, function nodes
@@ -35,7 +35,7 @@ tests/           unit, determinism and analysis accuracy tests (Catch2)
 docs/            ARCHITECTURE.md, DECISIONS.md, node reference
 ```
 
-Core builds with CMake as the static library `mre_core` (alias `mre::core`). UE links it as a ThirdParty static library through `Build.cs`; Godot links it through godot-cpp.
+Core builds with CMake as the static library `ztrip_core` (alias `ztrip::core`). UE links it as a ThirdParty static library through `Build.cs`; Godot links it through godot-cpp.
 
 ## Building
 
@@ -47,7 +47,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Options: `MRE_BUILD_TOOLS` and `MRE_BUILD_TESTS` (both `ON` by default). Catch2 is fetched at configure time unless an installed Catch2 3.x is found.
+Options: `ZTRIP_BUILD_TOOLS` and `ZTRIP_BUILD_TESTS` (both `ON` by default). Catch2 is fetched at configure time unless an installed Catch2 3.x is found.
 
 ## Threading
 
