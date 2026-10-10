@@ -3,6 +3,7 @@
 
 #include "property_binder.h"
 #include "ztrip_analysis.h"
+#include "ztrip_timeline.h"
 
 #include "ztrip/graph/evaluator.hpp"
 
@@ -24,6 +25,11 @@ namespace godot {
 // resolved relative to target_root. It runs in the editor as well, so the
 // scene reacts while you scrub `time` or press `playing` in the inspector.
 // Macros appear in the inspector under "macros/".
+//
+// The player also holds the song's timeline (tempo map and Note Sequence,
+// see ZtripTimeline), which the graph's BeatClock and NoteLane nodes read.
+// It loads tempo_file and sequence_file when they exist; otherwise it drafts
+// both from the analysis, and drafts again when the song changes.
 class ZtripPlayer : public Node {
     GDCLASS(ZtripPlayer, Node)
 
@@ -37,6 +43,10 @@ public:
     String get_audio_file() const { return audio_file_; }
     void set_graph_file(const String& path);
     String get_graph_file() const { return graph_file_; }
+    void set_tempo_file(const String& path);
+    String get_tempo_file() const { return tempo_file_; }
+    void set_sequence_file(const String& path);
+    String get_sequence_file() const { return sequence_file_; }
     void set_target_root(const NodePath& path);
     NodePath get_target_root() const { return target_root_; }
     void set_active(bool active);
@@ -67,6 +77,13 @@ public:
     double get_duration() const;
     double get_bpm() const;
     Ref<ZtripAnalysis> get_analysis() const;
+    Ref<ZtripTimeline> get_timeline() const { return timeline_; }
+    // Re-reads tempo_file and sequence_file (drafting what is missing).
+    void reload_timeline();
+    // Drafts the tempo map and notes from the analysis again, keeping the nudge.
+    Error draft_timeline(const String& grid = "1/16");
+    // Writes the timeline to tempo_file and sequence_file.
+    Error save_timeline();
     String get_resolved_audio_file() const { return resolved_audio_file_; }
 
     double get_output(const String& target) const;
@@ -102,10 +119,14 @@ private:
     void evaluate_and_apply();
     void apply_macros();
     void set_status_changed();
+    void bind_timeline();
+    void on_timeline_changed();
 
     NodePath audio_player_;
     String audio_file_;
     String graph_file_;
+    String tempo_file_;
+    String sequence_file_;
     NodePath target_root_ = NodePath("..");
     bool active_ = true;
     bool playing_ = false;
@@ -119,6 +140,13 @@ private:
     Ref<ZtripAnalysis> analysis_ref_;
     ztrip::godot_host::PropertyBinder binder_;
     std::map<std::string, double> macro_values_;
+
+    Ref<ZtripTimeline> timeline_;
+    bool has_tempo_ = false;         // the timeline's tempo map came from a file or a draft
+    bool tempo_from_file_ = false;
+    bool sequence_from_file_ = false;
+    String timeline_song_;           // the song the timeline was drafted for
+    String timeline_error_;
 
     std::future<ztrip::godot_host::AnalysisOutcome> pending_;
     String pending_file_;

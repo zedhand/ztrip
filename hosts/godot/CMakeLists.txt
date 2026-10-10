@@ -21,6 +21,7 @@ add_library(ztrip_godot SHARED
   src/ztrip_graph_tools.cpp
   src/property_binder.cpp
   src/ztrip_player.cpp
+  src/ztrip_timeline.cpp
 )
 target_link_libraries(ztrip_godot PRIVATE ztrip::core godot::cpp)
 target_compile_features(ztrip_godot PRIVATE cxx_std_20)

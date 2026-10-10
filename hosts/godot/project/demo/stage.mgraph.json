@@ -3,17 +3,17 @@
   "version": 1,
   "name": "Demo stage",
   "nodes": [
-    {"id": "kick", "type": "AudioOnset", "params": {"band": "Sub", "min_velocity": 0.3}, "pos": [0, 0]},
+    {"id": "kick", "type": "NoteLane", "params": {"lane": "Kick"}, "pos": [0, 0]},
     {"id": "kick_flash", "type": "ImpulseDecay", "params": {"decay_ms": 180}, "pos": [240, 0]},
     {"id": "kick_gain", "type": "Multiply", "params": {"b": 14}, "pos": [480, 0]},
     {"id": "kick_light", "type": "PropertyOut", "params": {"target": "Lights/Kick:light_energy"}, "pos": [720, 0]},
 
-    {"id": "snare", "type": "AudioOnset", "params": {"band": "Mid", "min_velocity": 0.35}, "pos": [0, 160]},
+    {"id": "snare", "type": "NoteLane", "params": {"lane": "Snare"}, "pos": [0, 160]},
     {"id": "snare_flash", "type": "ImpulseDecay", "params": {"decay_ms": 220}, "pos": [240, 160]},
     {"id": "snare_gain", "type": "Multiply", "params": {"b": 20}, "pos": [480, 160]},
     {"id": "snare_light", "type": "PropertyOut", "params": {"target": "Lights/Snare:light_energy"}, "pos": [720, 160]},
 
-    {"id": "hats", "type": "AudioOnset", "params": {"band": "Air", "min_velocity": 0.4}, "pos": [0, 320]},
+    {"id": "hats", "type": "NoteLane", "params": {"lane": "Hats"}, "pos": [0, 320]},
     {"id": "hats_flash", "type": "ImpulseDecay", "params": {"decay_ms": 70}, "pos": [240, 320]},
     {"id": "hats_gain", "type": "Multiply", "params": {"b": 4}, "pos": [480, 320]},
     {"id": "hats_light", "type": "PropertyOut", "params": {"target": "Lights/Hats:light_energy"}, "pos": [720, 320]},
