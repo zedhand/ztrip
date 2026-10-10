@@ -84,7 +84,16 @@ ev.bind_sequence("main", &seq);
 - [hosts/godot/README.md](hosts/godot/README.md): the Godot addon
 - [DECISIONS.md](docs/DECISIONS.md): design decisions and why
 - [RELEASING.md](docs/RELEASING.md): versioning, beta downloads and cutting a release
+- [CONTRIBUTING.md](CONTRIBUTING.md): reporting bugs and sending changes
 
 ## Feedback
 
-Bugs and questions go to [GitHub issues](https://github.com/zedhand/ztrip/issues).
+Bugs and questions go to [GitHub issues](https://github.com/zedhand/ztrip/issues). Security problems: see [SECURITY.md](SECURITY.md). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Privacy
+
+ztrip collects nothing: no telemetry, no accounts, no network requests. Details in [PRIVACY.md](PRIVACY.md).
+
+## License
+
+ztrip is released under the [MIT license](LICENSE). Third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
