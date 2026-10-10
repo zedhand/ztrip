@@ -3,16 +3,24 @@
 // Analyses a WAV file, stores the result in a .sigcache next to the CSVs
 // (reused on the next run if audio and settings are unchanged), and writes
 // signals.csv, events.csv, beats.csv plus plot.py, which renders PNGs with
-// matplotlib.
+// matplotlib. It also drafts musical time: a tempo map fitted to the
+// detected beats and a Note Sequence with an auto-drafted Kick lane, and can
+// render that lane as clicks over the track for checking by ear.
 #include "ztrip/analysis/offline.hpp"
 #include "ztrip/io/wav.hpp"
+#include "ztrip/serialize/nseq.hpp"
 #include "ztrip/serialize/sigcache.hpp"
+#include "ztrip/serialize/tempo.hpp"
+#include "ztrip/time/autodraft.hpp"
+#include "ztrip/time/tempo_map.hpp"
 #include "ztrip/version.hpp"
 
 #include "plot_script.hpp"
 
 #include <algorithm>
 #include <charconv>
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
@@ -34,6 +42,8 @@ Runs offline analysis (bands, envelopes, onsets, beats) and writes:
   <out>/<name>.sigcache   binary analysis cache, reused when unchanged
   <out>/signals.csv       120 Hz signals (band.*, env.*, rms, centroid)
   <out>/events.csv        onsets per band, kicks, beats and downbeats
+  <out>/<name>.tempo.json tempo map fitted to the detected beats
+  <out>/<name>.nseq.json  Note Sequence with an auto-drafted Kick lane
   <out>/beats.csv         beat grid with bar/beat numbers
   <out>/plot.py           renders PNG plots: python3 plot.py [--start S --end S]
 
@@ -51,6 +61,11 @@ options:
   --kick-rise DB        level jump a kick needs, higher = fewer kicks (default 12)
   --bpm-prior BPM       centre of the tempo prior (default 120)
   --beats-per-bar N     beats per bar for downbeats (default 4)
+  --grid G              auto-draft grid, 1/1..1/64, T for triplets (default 1/16)
+  --kick-events NAME    event list the Kick lane is drafted from (default kick, else onset.Sub)
+  --nudge MS            shift the tempo map (and drafted notes) by MS milliseconds
+  --clicks              also write <out>/kick_clicks.wav: the track with a click
+                        on every drafted kick, for checking the draft by ear
   --no-cache            ignore any existing .sigcache
   -v, --version         print the version
   -h, --help            print this help
@@ -61,6 +76,9 @@ struct Options {
     fs::path out;
     analysis::AnalysisSettings settings;
     bool use_cache = true;
+    time::DraftSettings draft;
+    double nudge_ms = 0.0;
+    bool clicks = false;
 };
 
 template <typename T>
@@ -141,6 +159,23 @@ std::optional<int> parse_args(int argc, char** argv, Options& opt) {
             if (!number(s.beats.prior_bpm) || s.beats.prior_bpm <= 0.0f) return 2;
         } else if (arg == "--beats-per-bar") {
             if (!number(s.beats.beats_per_bar) || s.beats.beats_per_bar < 1) return 2;
+        } else if (arg == "--grid") {
+            const auto v = value();
+            if (!v) return 2;
+            const auto g = time::parse_grid(*v);
+            if (!g) {
+                std::cerr << "analyze-cli: --grid must look like 1/16 or 1/8T\n";
+                return 2;
+            }
+            opt.draft.grid = *g;
+        } else if (arg == "--kick-events") {
+            const auto v = value();
+            if (!v) return 2;
+            opt.draft.lanes = {{"Kick", std::string(*v), 0.0f, ""}};
+        } else if (arg == "--nudge") {
+            if (!number(opt.nudge_ms)) return 2;
+        } else if (arg == "--clicks") {
+            opt.clicks = true;
         } else if (arg == "--no-cache") {
             opt.use_cache = false;
         } else if (!arg.empty() && arg[0] == '-') {
@@ -209,6 +244,51 @@ void write_beats_csv(const fs::path& path, const analysis::AnalysisResult& r) {
     }
 }
 
+// 16-bit stereo WAV of a mono signal.
+void write_wav16(const fs::path& path, const std::vector<float>& mono, int sample_rate) {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out) throw std::runtime_error("cannot write " + path.string());
+    auto u32 = [&](std::uint32_t v) { out.write(reinterpret_cast<const char*>(&v), 4); };
+    auto u16 = [&](std::uint16_t v) { out.write(reinterpret_cast<const char*>(&v), 2); };
+    const auto data_bytes = static_cast<std::uint32_t>(mono.size() * 4);
+    out.write("RIFF", 4);
+    u32(36 + data_bytes);
+    out.write("WAVEfmt ", 8);
+    u32(16);
+    u16(1);
+    u16(2);
+    u32(static_cast<std::uint32_t>(sample_rate));
+    u32(static_cast<std::uint32_t>(sample_rate) * 4);
+    u16(4);
+    u16(16);
+    out.write("data", 4);
+    u32(data_bytes);
+    for (float x : mono) {
+        const auto s = static_cast<std::int16_t>(std::lround(std::clamp(x, -1.0f, 1.0f) * 32767.0f));
+        u16(static_cast<std::uint16_t>(s));
+        u16(static_cast<std::uint16_t>(s));
+    }
+}
+
+// The track at half level with a short 1.5 kHz click on every note of a lane.
+std::vector<float> click_mix(const io::AudioBuffer& audio, const time::Lane& lane, const time::TempoMap& tempo) {
+    std::vector<float> mix = io::to_mono(audio);
+    for (float& x : mix) x *= 0.5f;
+    const int sr = audio.sample_rate;
+    const auto click_len = static_cast<std::size_t>(0.03 * sr);
+    for (const auto& n : lane.notes) {
+        const double t = tempo.seconds_at(n.start_beat);
+        if (t < 0.0) continue;
+        const auto start = static_cast<std::size_t>(std::lround(t * sr));
+        for (std::size_t i = 0; i < click_len && start + i < mix.size(); ++i) {
+            const double s = static_cast<double>(i) / sr;
+            mix[start + i] += static_cast<float>(0.6 * std::sin(2.0 * 3.141592653589793 * 1500.0 * s) *
+                                                 std::exp(-s / 0.006));
+        }
+    }
+    return mix;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -241,6 +321,14 @@ int main(int argc, char** argv) {
         write_beats_csv(opt.out / "beats.csv", r);
         open_out(opt.out / "plot.py") << tools::kPlotScript;
 
+        time::TempoMap tempo = time::tempo_map_from_beats(r.beats);
+        tempo.set_nudge(opt.nudge_ms / 1000.0);
+        const time::NoteSequence draft = time::auto_draft(r, tempo, opt.draft);
+        const fs::path tempo_path = opt.out / (opt.input.stem().string() + ".tempo.json");
+        const fs::path nseq_path = opt.out / (opt.input.stem().string() + ".nseq.json");
+        serialize::save_tempo_map(tempo_path, tempo);
+        serialize::save_nseq(nseq_path, draft);
+
         std::printf("input     %s\n", opt.input.string().c_str());
         std::printf("audio     %.2f s, %d Hz, %d ch\n", audio.duration_seconds(), audio.sample_rate,
                     audio.channels);
@@ -251,6 +339,16 @@ int main(int argc, char** argv) {
             if (list.name.rfind("onset.", 0) == 0 || list.name == "kick") {
                 std::printf("%-16s %zu\n", list.name.c_str(), list.events.size());
             }
+        }
+        std::printf("tempo map %s (%zu segments)\n", tempo_path.string().c_str(), tempo.segments().size());
+        for (const auto& lane : draft.lanes) {
+            std::printf("lane      %s: %zu notes -> %s\n", lane.name.c_str(), lane.notes.size(),
+                        nseq_path.string().c_str());
+        }
+        if (opt.clicks && !draft.lanes.empty()) {
+            const fs::path clicks = opt.out / "kick_clicks.wav";
+            write_wav16(clicks, click_mix(audio, draft.lanes.front(), tempo), audio.sample_rate);
+            std::printf("clicks    %s\n", clicks.string().c_str());
         }
         std::printf("plots     python3 %s\n", (opt.out / "plot.py").string().c_str());
     } catch (const std::exception& e) {
