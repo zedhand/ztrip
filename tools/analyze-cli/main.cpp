@@ -41,7 +41,7 @@ constexpr std::string_view kUsage = R"(usage: analyze-cli <input.wav> [options]
 Runs offline analysis (bands, envelopes, onsets, beats) and writes:
   <out>/<name>.sigcache   binary analysis cache, reused when unchanged
   <out>/signals.csv       120 Hz signals (band.*, env.*, rms, centroid)
-  <out>/events.csv        onsets per band, beats and downbeats
+  <out>/events.csv        onsets per band, kicks, beats and downbeats
   <out>/<name>.tempo.json tempo map fitted to the detected beats
   <out>/<name>.nseq.json  Note Sequence with an auto-drafted Kick lane
   <out>/beats.csv         beat grid with bar/beat numbers
@@ -58,6 +58,7 @@ options:
   --hold MS             envelope hold in ms (default 0)
   --sensitivity X       onset threshold multiplier, lower = more onsets (default 1.5)
   --min-gap MS          minimum time between onsets in ms (default 50)
+  --kick-rise DB        level jump a kick needs, higher = fewer kicks (default 12)
   --bpm-prior BPM       centre of the tempo prior (default 120)
   --beats-per-bar N     beats per bar for downbeats (default 4)
   --grid G              auto-draft grid, 1/1..1/64, T for triplets (default 1/16)
@@ -152,6 +153,8 @@ std::optional<int> parse_args(int argc, char** argv, Options& opt) {
             float ms = 0.0f;
             if (!number(ms)) return 2;
             s.onsets.min_gap_s = ms / 1000.0f;
+        } else if (arg == "--kick-rise") {
+            if (!number(s.kick.min_rise_db) || s.kick.min_rise_db <= 0.0f) return 2;
         } else if (arg == "--bpm-prior") {
             if (!number(s.beats.prior_bpm) || s.beats.prior_bpm <= 0.0f) return 2;
         } else if (arg == "--beats-per-bar") {
@@ -333,7 +336,7 @@ int main(int argc, char** argv) {
         std::printf("tempo     %.2f BPM, %zu beats, %zu downbeats\n", r.beats.bpm,
                     r.beats.beats.size(), r.beats.downbeats.size());
         for (const auto& list : r.events) {
-            if (list.name.rfind("onset.", 0) == 0) {
+            if (list.name.rfind("onset.", 0) == 0 || list.name == "kick") {
                 std::printf("%-16s %zu\n", list.name.c_str(), list.events.size());
             }
         }
