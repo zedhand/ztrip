@@ -9,6 +9,7 @@ add_library(ztrip_core STATIC
   analysis/kick.cpp
   analysis/beats.cpp
   analysis/offline.cpp
+  analysis/live.cpp
   serialize/sigcache.cpp
   serialize/mgraph.cpp
   graph/node.cpp
