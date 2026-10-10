@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.24)
 project(ztrip
   VERSION 0.1.0
   DESCRIPTION "Music-reactive animation engine"
-  LANGUAGES CXX)
+  LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +15,7 @@ option(ZTRIP_BUILD_TESTS "Build unit tests" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(ZtripWarnings)
+include(ZtripDependencies)
 
 add_subdirectory(core)
 
