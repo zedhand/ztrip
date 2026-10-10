@@ -51,3 +51,67 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
       - name: Test
         run: ctest --preset ${{ matrix.preset }}
+
+  godot:
+    name: Godot host (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-24.04
+            cc: gcc
+            cxx: g++
+          - name: Windows
+            os: windows-2022
+            cc: cl
+            cxx: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Install Ninja
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure
+        run: cmake --preset godot
+      - name: Build
+        run: cmake --build --preset godot
+      - name: Test core
+        run: ctest --preset godot
+      - name: Test in Godot
+        run: |
+          # The oldest supported Godot and the newest one tested.
+          for version in 4.5.1 4.7.2; do
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              zip="Godot_v${version}-stable_win64.exe.zip"
+              exe="Godot_v${version}-stable_win64_console.exe"
+            else
+              zip="Godot_v${version}-stable_linux.x86_64.zip"
+              exe="Godot_v${version}-stable_linux.x86_64"
+            fi
+            mkdir -p "$RUNNER_TEMP/godot-$version"
+            curl -sSfL -o "$RUNNER_TEMP/$zip" "https://github.com/godotengine/godot/releases/download/${version}-stable/$zip"
+            unzip -q -o "$RUNNER_TEMP/$zip" -d "$RUNNER_TEMP/godot-$version"
+            godot="$RUNNER_TEMP/godot-$version/$exe"
+            rm -rf hosts/godot/project/.godot
+            # Godot 4.5.1 can crash on exit after a first import with any
+            # GDExtension loaded; the import itself completes, so check that.
+            "$godot" --headless --path hosts/godot/project --import || true
+            test -f hosts/godot/project/.godot/extension_list.cfg
+            "$godot" --headless --path hosts/godot/project -s res://tests/test_host.gd
+          done
+      - name: Upload the addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztrip-godot-${{ runner.os }}
+          path: |
+            hosts/godot/project
+            !hosts/godot/project/.godot
