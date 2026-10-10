@@ -55,6 +55,10 @@ for ax, band in zip(axes, bands):
 kicks = [x for x, _ in events.get("kick", []) if args.start <= x <= end]
 axes[0].plot(kicks, [1.0] * len(kicks), "v", color="#e67e22", ms=5, label="kicks")
 axes[0].legend(loc="upper right", fontsize=8)
+snares = [x for x, _ in events.get("snare", []) if args.start <= x <= end]
+mid_row = axes[bands.index("Mid")] if "Mid" in bands else axes[0]
+mid_row.plot(snares, [1.0] * len(snares), "v", color="#16a085", ms=5, label="snares")
+mid_row.legend(loc="upper right", fontsize=8)
 
 ax = axes[-1]
 ax.plot(t[sel], data[sel, names.index("rms")], color="#2c3e50", lw=1.0, label="rms")
