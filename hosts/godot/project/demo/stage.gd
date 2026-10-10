@@ -1,6 +1,7 @@
 extends Node3D
-## Demo stage: the red light flashes on kicks, the blue spot on snares, the
-## white light on hi-hats, the orb glows with the bass and pulses on each beat,
+## Demo stage: the red light flashes on the Kick lane's notes, the blue spot on
+## the Snare lane's, the white light on the Hats lane's (the player drafts the
+## lanes from the song; edit them in the Timeline panel), the orb glows with the bass and pulses on each beat,
 ## and the camera pushes in on every bar. A HUD shows where the song is.
 ##
 ## Command line (after --), used to render videos:
@@ -8,6 +9,7 @@ extends Node3D
 ##   --start=<seconds>   start there
 ##   --length=<seconds>  quit after this much of the song
 ##   --caption=<text>    a line of text under the HUD
+##   --timeline=1        show the Timeline panel along the bottom
 
 @onready var _player: Node = $ZtripPlayer
 @onready var _music: AudioStreamPlayer = $Music
@@ -40,6 +42,8 @@ func _ready() -> void:
 		_music.stream = load("res://music/song.wav")
 		_player.reload()
 	_player.wait_until_loaded()
+	if args.get("timeline", "") == "1":
+		_build_timeline()
 	if not _player.get_status().is_empty():
 		print(_player.get_status())
 	_player.play(start)
@@ -91,6 +95,27 @@ func _build_hud(caption: String) -> void:
 		_caption.add_theme_font_size_override("font_size", 20)
 		_caption.position = Vector2(24, 660)
 		$HUD.add_child(_caption)
+
+
+func _build_timeline() -> void:
+	var panel: Control = load("res://addons/ztrip/editor/timeline_panel.gd").new()
+	panel.anchor_left = 0.0
+	panel.anchor_right = 1.0
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_top = -230
+	var bg := ColorRect.new()
+	bg.color = Color(0.08, 0.08, 0.1, 0.92)
+	bg.anchor_right = 1.0
+	bg.anchor_top = 1.0
+	bg.anchor_bottom = 1.0
+	bg.offset_top = -234
+	$HUD.add_child(bg)
+	$HUD.add_child(panel)
+	panel.attach_player(_player)
+	panel.set_view(0.0, 140.0)
+	if _caption:
+		_caption.position.y = 450
 
 
 func _process(_delta: float) -> void:
