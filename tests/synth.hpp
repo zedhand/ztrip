@@ -55,6 +55,17 @@ inline void add_hat(std::vector<float>& x, int sr, double t, Noise& noise, float
     }
 }
 
+// A plucked synth bass note: sine plus a little saw, fast attack, short release.
+inline void add_bass(std::vector<float>& x, int sr, double t, double hz, double length, float gain = 0.35f) {
+    const auto start = static_cast<std::size_t>(std::lround(t * sr));
+    for (std::size_t i = 0; i < static_cast<std::size_t>(length * sr) && start + i < x.size(); ++i) {
+        const double s = static_cast<double>(i) / sr;
+        const double saw = 2.0 * (hz * s - std::floor(hz * s)) - 1.0;
+        const double shape = std::min(1.0, s / 0.003) * std::min(1.0, (length - s) / 0.01);
+        x[start + i] += gain * static_cast<float>((0.7 * std::sin(2.0 * std::numbers::pi * hz * s) + 0.3 * saw) * shape);
+    }
+}
+
 // A 4/4 groove: kick on every beat, snare on 2 and 4, hats on eighths.
 // `first_beat` delays the pattern; returns the signal.
 inline std::vector<float> groove(int sr, double bpm, int bars, double first_beat = 0.0,

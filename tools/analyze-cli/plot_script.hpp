@@ -52,6 +52,8 @@ for ax, band in zip(axes, bands):
         ax.axvline(b, color="#888", lw=0.6, ls="--")
     ax.set_ylim(0, 1.05)
     ax.set_ylabel(band)
+kicks = [x for x, _ in events.get("kick", []) if args.start <= x <= end]
+axes[0].plot(kicks, [1.0] * len(kicks), "v", color="#e67e22", ms=5, label="kicks")
 axes[0].legend(loc="upper right", fontsize=8)
 
 ax = axes[-1]

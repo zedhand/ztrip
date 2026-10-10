@@ -31,7 +31,7 @@ private:
 
 // Bumped whenever the pipeline changes in a way that alters its output, so
 // old caches are regenerated.
-constexpr std::uint32_t kPipelineVersion = 1;
+constexpr std::uint32_t kPipelineVersion = 3;
 
 } // namespace
 
@@ -100,6 +100,7 @@ AnalysisResult analyze(std::span<const float> mono, int sample_rate, const Analy
     const float nyquist = static_cast<float>(sample_rate) / 2.0f;
     const std::vector<float> full_flux = band_flux(spec, {"full", 20.0f, std::min(16000.0f, nyquist)});
     r.events.push_back({"onset.full", pick_onsets(full_flux, fr, settings.onsets)});
+    r.events.push_back({"kick", detect_kicks(mono, sample_rate, settings.kick)});
 
     // Beat tracking listens to the default bands with equal weight, so the
     // many high-frequency bins (hats) don't outvote the kick and snare.
@@ -163,6 +164,14 @@ std::uint64_t settings_hash(const AnalysisSettings& s) {
     h.add(s.onsets.window_s);
     h.add(s.onsets.min_gap_s);
     h.add(s.onsets.min_scale);
+    h.add(s.kick.cutoff_hz);
+    h.add(s.kick.window_ms);
+    h.add(s.kick.hop_ms);
+    h.add(s.kick.lag_ms);
+    h.add(s.kick.min_rise_db);
+    h.add(s.kick.gate_db);
+    h.add(s.kick.range_db);
+    h.add(s.kick.min_gap_s);
     h.add(s.beats.min_bpm);
     h.add(s.beats.max_bpm);
     h.add(s.beats.prior_bpm);
