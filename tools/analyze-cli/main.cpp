@@ -31,6 +31,12 @@
 #include <string>
 #include <string_view>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 namespace fs = std::filesystem;
 using namespace ztrip;
 
@@ -292,6 +298,10 @@ std::vector<float> click_mix(const io::AudioBuffer& audio, const time::Lane& lan
 } // namespace
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    // utf8.manifest makes argv and paths UTF-8; print file names the same way.
+    SetConsoleOutputCP(CP_UTF8);
+#endif
     Options opt;
     if (const auto code = parse_args(argc, argv, opt)) return *code;
 
@@ -350,7 +360,12 @@ int main(int argc, char** argv) {
             write_wav16(clicks, click_mix(audio, draft.lanes.front(), tempo), audio.sample_rate);
             std::printf("clicks    %s\n", clicks.string().c_str());
         }
-        std::printf("plots     python3 %s\n", (opt.out / "plot.py").string().c_str());
+#ifdef _WIN32
+        constexpr const char* python = "py"; // the python.org launcher
+#else
+        constexpr const char* python = "python3";
+#endif
+        std::printf("plots     %s %s\n", python, (opt.out / "plot.py").string().c_str());
     } catch (const std::exception& e) {
         std::cerr << "analyze-cli: " << e.what() << '\n';
         return 1;
