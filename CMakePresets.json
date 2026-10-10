@@ -14,14 +14,23 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "godot",
+      "displayName": "Release with the Godot host (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/godot",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "ZTRIP_BUILD_GODOT": "ON" }
     }
   ],
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev" },
-    { "name": "release", "configurePreset": "release" }
+    { "name": "release", "configurePreset": "release" },
+    { "name": "godot", "configurePreset": "godot" }
   ],
   "testPresets": [
     { "name": "dev", "configurePreset": "dev", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } },
-    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } }
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } },
+    { "name": "godot", "configurePreset": "godot", "output": { "outputOnFailure": true }, "execution": { "noTestsAction": "error" } }
   ]
 }
