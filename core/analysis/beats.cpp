@@ -319,13 +319,15 @@ BeatGrid analyze_beats(const Spectrogram& spec, std::span<const float> onset_str
     if (!drum_hits.empty() && tempo > 0.0) {
         // Check the related tempos against the drum hits. The candidates are
         // tracked on the plain onset strength so each gets the same footing.
-        const DrumFit base = drum_fit(track_beats(onset_strength, fr, tempo, settings), drum_hits);
+        BeatSettings check = settings;
+        check.tightness = settings.check_tightness;
+        const DrumFit base = drum_fit(track_beats(onset_strength, fr, tempo, check), drum_hits);
         double best_f = base.f;
         const double estimate = tempo;
         for (const double m : {0.5, 2.0 / 3.0, 1.5, 2.0}) {
             const double candidate = estimate * m;
             if (candidate < settings.min_bpm || candidate > settings.max_bpm) continue;
-            const DrumFit fit = drum_fit(track_beats(onset_strength, fr, candidate, settings), drum_hits);
+            const DrumFit fit = drum_fit(track_beats(onset_strength, fr, candidate, check), drum_hits);
             if (fit.f >= settings.min_drum_fit && fit.precision >= settings.min_drum_precision &&
                 fit.f - base.f >= settings.drum_fit_margin && fit.f > best_f) {
                 best_f = fit.f;
