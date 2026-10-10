@@ -30,6 +30,7 @@ add_executable(ztrip_tests
   test_graph_timeline.cpp
   test_live.cpp
   test_capture.cpp
+  test_controls.cpp
 )
 find_package(Threads REQUIRED)
 target_link_libraries(ztrip_tests PRIVATE ztrip::core Catch2::Catch2WithMain Threads::Threads)

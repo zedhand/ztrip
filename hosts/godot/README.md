@@ -106,6 +106,29 @@ use `AudioOnset` on `Sub` with `min_velocity` around 0.3 for kicks, and
 `BeatClock` runs at its `bpm` param. `NoteLane` stays silent, since the
 timeline belongs to the song.
 
+### MIDI, OSC and DMX
+
+| Property | What it does |
+| --- | --- |
+| `midi_input`, `midi_port` | Listen to a MIDI input (empty port: the first; `ZtripPlayer.get_midi_ports()` lists them). |
+| `osc_input`, `osc_port` | Listen for OSC on a UDP port (default 9000). |
+| `dmx_input`, `dmx_port`, `dmx_universes` | Off, Art-Net (UDP 6454) or sACN (UDP 5568, joining the multicast groups of `dmx_universes`). |
+| `control_bindings` | Controls that drive macros: `{macro, control, min, max}`. Saved with the scene. |
+
+Graph nodes `MidiNote`, `MidiCC`, `OscValue` and `DmxChannel` read the
+inputs directly. To drive a macro instead, call `learn_macro("Gain")` and move
+a fader, knob or pad: the first control that changes is bound over the
+macro's range (signal `control_learned`). `bind_control(macro, control, min,
+max)` binds by name (`midi/0/cc/7`, `osc/fader/1`, `dmx/0/12`), and
+`save_controls(path)` / `load_controls(path)` swap `*.controls.json` profiles
+per show. `get_control_names()` lists every control seen so far and
+`get_control_value(name)` reads one, for a learn UI or a HUD.
+
+Inputs are read while playing (song or live). Paused, a moved control still
+updates its bound macro, and nodes see controls once playing resumes. An
+Art-Net fader reaches the scene within one frame of arriving (about 18 ms at
+60 fps in the tests).
+
 ### Target paths
 
 A `PropertyOut` target is `<node path>:<property path>`, relative to

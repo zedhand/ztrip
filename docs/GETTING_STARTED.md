@@ -13,6 +13,7 @@ If something here does not match what you see, that is worth reporting too (see 
 | Godot addon | Ready for testing | [Godot addon](#godot-addon) |
 | Timeline, tempo map and note lanes | Ready for testing | [Timeline](#timeline) |
 | Live audio (microphone, loopback) | Early, for trying out | [Live audio](#live-audio) |
+| MIDI, OSC and DMX control | Early, for trying out | [MIDI, OSC and DMX](#midi-osc-and-dmx) |
 
 Supported platforms for the beta are Windows 11 and Linux. macOS is not supported yet.
 
@@ -199,6 +200,16 @@ ztrip can also react to sound as it happens: a microphone, or whatever the compu
 
 What to look for: clap or play music near the microphone and the Sub/Bass onsets should tick on kicks, with the light flashing on them. Live analysis adds about 15 ms; the sound card's buffer comes on top.
 
+## MIDI, OSC and DMX
+
+Faders, knobs and pads can drive a scene too, from a MIDI controller, an OSC app (TouchOSC, Open Stage Control) or a lighting desk over Art-Net or sACN.
+
+1. On the ZtripPlayer, under **Controls**, tick **Midi Input**, **Osc Input** or pick a **Dmx Input** protocol. The status line says what it is listening on.
+2. Press **Playing**. To make a fader drive one of the graph's macros, call `learn_macro("<macro name>")` from a script (or the remote debugger) and move the fader once. It is bound, and the binding saves with the scene.
+3. Or read controls in the graph itself with the **MidiNote**, **MidiCC**, **OscValue** and **DmxChannel** nodes.
+
+What to look for: the scene follows the fader within a frame. On Linux, MIDI needs ALSA (it is there on any desktop); Art-Net and OSC need the firewall to let UDP ports 6454 and 9000 in.
+
 ## Known limitations
 
 - Input must be WAV; convert other formats first. In Godot, WAVs must be plain PCM (see [Godot addon](#godot-addon)).
@@ -206,7 +217,7 @@ What to look for: clap or play music near the microphone and the Sub/Bass onsets
 - Snare and Hats lanes are drafted from plain band onsets and need cleaning up on busy mixes.
 - Tempo changes can't be drawn in the Timeline yet (only nudged and scaled); edit the `.tempo.json` for that.
 - The Sub band also picks up bass notes, so it can tick on a bassline as well as the kick. The Timeline's Kick lane uses the dedicated kick detector instead.
-- Live audio has no beat grid or dedicated kick detector yet: `BeatClock` runs at a fixed `bpm`, and kicks come from Sub-band onsets. MIDI, OSC and DMX input are still to come.
+- Live audio has no beat grid or dedicated kick detector yet: `BeatClock` runs at a fixed `bpm`, and kicks come from Sub-band onsets. There is no learn button in the editor yet (use `learn_macro()` from a script), no MIDI clock or OSC output, and no gamepad or keyboard input.
 
 ## Reporting problems
 

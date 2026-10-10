@@ -6,7 +6,8 @@ extends SceneTree
 ## shader uniform and a camera, and checks the values, seeking, macros,
 ## hot reload and write-back, then drafts and edits the song's timeline
 ## through the Timeline panel, and plays the kick track in as simulated live
-## input. Exits with the number of failed checks.
+## input, and drives it from Art-Net and OSC packets sent to itself, MIDI-learn
+## style. Exits with the number of failed checks.
 
 const RATE := 48000
 const BPM := 120.0
@@ -17,6 +18,10 @@ const LANE_GRAPH := "user://ztrip_test_lanes.mgraph.json"
 const TEMPO := "user://ztrip_test.tempo.json"
 const SEQUENCE := "user://ztrip_test.nseq.json"
 const LIVE_GRAPH := "user://ztrip_test_live.mgraph.json"
+const CONTROLS_GRAPH := "user://ztrip_test_controls.mgraph.json"
+const CONTROLS_PROFILE := "user://ztrip_test.controls.json"
+const OSC_PORT := 39211
+const ARTNET_PORT := 39212
 
 var _failures := 0
 var _checks := 0
@@ -171,6 +176,7 @@ func _run() -> void:
 	await _test_graph_panel()
 	await _test_timeline()
 	await _test_live()
+	await _test_controls()
 
 
 # Live input: the kick track played in real time as if from a microphone.
@@ -216,6 +222,124 @@ func _test_live() -> void:
 	player.stop()
 	_check(not player.is_live_running(), "stop ends live input")
 	scene.free()
+
+
+# MIDI/OSC/DMX controls: a desk fader over Art-Net and OSC messages, sent
+# over UDP to the player, drive the graph and (through learn) a macro.
+func _test_controls() -> void:
+	var doc := {
+		"format": "ztrip.mgraph", "version": 1, "name": "controls test",
+		"nodes": [
+			{"id": "fader", "type": "DmxChannel", "params": {"universe": 0, "channel": 1}},
+			{"id": "gain", "type": "Multiply", "params": {"b": 4.0}},
+			{"id": "light", "type": "PropertyOut", "params": {"target": "Lights/Key:light_energy"}},
+			{"id": "dim", "type": "OscValue", "params": {"address": "/scene/dim"}},
+			{"id": "indirect", "type": "PropertyOut", "params": {"target": "Lights/Key:light_indirect_energy"}},
+		],
+		"edges": [
+			{"from": "fader.out", "to": "gain.a"},
+			{"from": "gain.out", "to": "light.in"},
+			{"from": "dim.out", "to": "indirect.in"},
+		],
+		"macros": [{"name": "Gain", "node": "gain", "param": "b", "min": 0.0, "max": 8.0, "default": 4.0}],
+	}
+	var f := FileAccess.open(CONTROLS_GRAPH, FileAccess.WRITE)
+	f.store_string(JSON.stringify(doc, "  "))
+	f.close()
+
+	var scene := Node3D.new()
+	var lights := Node3D.new()
+	lights.name = "Lights"
+	scene.add_child(lights)
+	var light := OmniLight3D.new()
+	light.name = "Key"
+	light.light_energy = 0.7
+	lights.add_child(light)
+	var player: Node = ClassDB.instantiate("ZtripPlayer")
+	player.threaded_loading = false
+	player.audio_file = WAV
+	player.graph_file = CONTROLS_GRAPH
+	player.osc_input = true
+	player.osc_port = OSC_PORT
+	player.dmx_input = 1 # Art-Net
+	player.dmx_port = ARTNET_PORT
+	scene.add_child(player)
+	root.add_child(scene)
+	await process_frame
+	player.wait_until_loaded()
+	_check(player.get_status().contains("Art-Net on UDP port %d" % ARTNET_PORT), "controls listen: " + player.get_status())
+	player.play(0.0)
+
+	var udp := PacketPeerUDP.new()
+	# A desk fader at full on universe 0, channel 1.
+	udp.set_dest_address("127.0.0.1", ARTNET_PORT)
+	var levels := PackedByteArray()
+	levels.resize(512)
+	levels[0] = 255
+	var start := Time.get_ticks_msec()
+	udp.put_packet(_artnet(0, levels))
+	var arrived := await _wait_for(func(): return absf(light.light_energy - 4.0) < 1e-3)
+	_check(arrived, "an Art-Net fader drives the light (energy %.2f after %d ms)" % [light.light_energy, Time.get_ticks_msec() - start])
+
+	# Learn: arm the Gain macro, then move an OSC control.
+	udp.set_dest_address("127.0.0.1", OSC_PORT)
+	player.learn_macro("Gain")
+	_check(player.is_learning(), "learn is armed")
+	udp.put_packet(_osc("/gain", 0.5))
+	await _wait_for(func(): return not player.is_learning())
+	var bindings: Array = player.get_control_bindings()
+	_check(bindings.size() == 1 and bindings[0].control == "osc/gain" and bindings[0].macro == "Gain",
+			"moving a control binds it to the armed macro: %s" % str(bindings))
+	udp.put_packet(_osc("/gain", 0.25))
+	arrived = await _wait_for(func(): return absf(light.light_energy - 2.0) < 1e-3)
+	_check(arrived, "the learned control sets the macro (Gain %.2f, energy %.2f)" % [player.get_macro("Gain"), light.light_energy])
+
+	udp.put_packet(_osc("/scene/dim", 0.75))
+	arrived = await _wait_for(func(): return absf(light.light_indirect_energy - 0.75) < 1e-3)
+	_check(arrived, "an OSC value drives a target (%.2f)" % light.light_indirect_energy)
+
+	_check(player.save_controls(CONTROLS_PROFILE) == OK, "the controller profile saves")
+	player.unbind_control("Gain")
+	_check(player.get_control_bindings().is_empty(), "unbinding removes the binding")
+	_check(player.load_controls(CONTROLS_PROFILE) == OK and player.get_control_bindings().size() == 1,
+			"and loading the profile brings it back")
+	player.stop()
+	scene.free()
+
+
+# Waits up to a second of real time for a condition, a frame at a time.
+func _wait_for(condition: Callable) -> bool:
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 1000:
+		await process_frame
+		if condition.call():
+			return true
+	return false
+
+
+func _artnet(universe: int, levels: PackedByteArray) -> PackedByteArray:
+	var p := "Art-Net".to_ascii_buffer()
+	p.append(0)
+	p.append_array(PackedByteArray([0x00, 0x50, 0, 14, 0, 0, universe & 0xFF, (universe >> 8) & 0x7F,
+			(levels.size() >> 8) & 0xFF, levels.size() & 0xFF]))
+	p.append_array(levels)
+	return p
+
+
+func _osc(address: String, value: float) -> PackedByteArray:
+	var p := PackedByteArray()
+	for part in [address, ",f"]:
+		var b: PackedByteArray = part.to_ascii_buffer()
+		b.append(0)
+		while b.size() % 4 != 0:
+			b.append(0)
+		p.append_array(b)
+	var v := PackedByteArray()
+	v.resize(4)
+	v.encode_float(0, value)
+	v.reverse() # OSC is big-endian
+	p.append_array(v)
+	return p
 
 
 # The editor's Motion Graph panel: load, edit, check and save a graph.

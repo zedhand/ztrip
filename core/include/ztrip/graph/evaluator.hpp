@@ -48,6 +48,17 @@ public:
     void bind_tempo(std::string slot, const time::TempoMap* tempo);
     void bind_sequence(std::string slot, const time::NoteSequence* sequence);
 
+    // Binds live controls (MIDI, OSC, DMX) to a slot; null unbinds. Recording
+    // new control input needs no rebind: nodes look controls up by name.
+    void bind_controls(std::string slot, const io::ControlSet* controls);
+
+    // When to record control input that arrives now, if the next evaluate is
+    // at t: the tick that evaluate reaches, or the first tick not evaluated
+    // yet if that one already was. Input then shows on the next evaluate (or
+    // the one after, never on a tick already passed), so no trigger is missed
+    // and no change waits a frame longer than it must.
+    double stamp_time(double t) const noexcept;
+
     // Sets a macro, clamped to its range. Returns false for unknown names.
     // Clears checkpoints: playing on continues from the current state, while
     // a seek, or evaluating the current time again, replays with the new value.

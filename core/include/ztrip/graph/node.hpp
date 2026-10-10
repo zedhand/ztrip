@@ -19,6 +19,10 @@ class TempoMap;
 struct NoteSequence;
 }
 
+namespace ztrip::io {
+class ControlSet;
+}
+
 namespace ztrip::graph {
 
 // Port types. Continuous is a float per tick; Trigger fires on the tick an
@@ -54,7 +58,8 @@ struct ParamSpec {
 };
 
 // Named inputs a graph reads from, by slot (e.g. "main", "drums"): analysis
-// results, tempo maps and Note Sequences, each with its own slot names.
+// results, tempo maps, Note Sequences and live controls (MIDI, OSC, DMX),
+// each with its own slot names.
 // Rebinding a slot repoints every source node that reads it.
 class SourceSet {
 public:
@@ -67,10 +72,14 @@ public:
     void bind_sequence(std::string slot, const time::NoteSequence* sequence);
     const time::NoteSequence* find_sequence(std::string_view slot) const noexcept;
 
+    void bind_controls(std::string slot, const io::ControlSet* controls);
+    const io::ControlSet* find_controls(std::string_view slot) const noexcept;
+
 private:
     std::vector<std::pair<std::string, const analysis::AnalysisResult*>> slots_;
     std::vector<std::pair<std::string, const time::TempoMap*>> tempos_;
     std::vector<std::pair<std::string, const time::NoteSequence*>> sequences_;
+    std::vector<std::pair<std::string, const io::ControlSet*>> controls_;
 };
 
 // Everything a node may read while evaluating one tick.
