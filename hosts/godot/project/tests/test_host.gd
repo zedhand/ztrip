@@ -57,6 +57,8 @@ func _run() -> void:
 	_write_kick_wav(WAV)
 	_write_graph(GRAPH, 4.0, "Lights/Key:light_energy")
 
+	_check_wav_header_fix()
+
 	var analysis := ZtripAnalysis.new()
 	_check(analysis.load_file(WAV) == OK, "ZtripAnalysis loads the synthetic WAV: " + analysis.get_error())
 	_check(absf(analysis.get_bpm() - BPM) < 2.0, "tempo is about 120 BPM (got %.2f)" % analysis.get_bpm())
@@ -390,6 +392,57 @@ func _write_kick_wav(path: String) -> void:
 	f.store_32(data.size())
 	f.store_buffer(data)
 	f.close()
+
+
+# A 24-bit WAVE_FORMAT_EXTENSIBLE file, as ffmpeg writes it, with an odd-sized
+# chunk after the data: Godot can't import it until the addon rewrites the header.
+func _check_wav_header_fix() -> void:
+	var WavHeader = load("res://addons/ztrip/editor/wav_header.gd")
+	var path := "user://ztrip_test_extensible.wav"
+	var frames := 4800
+	var data := PackedByteArray()
+	data.resize(frames * 6)
+	for i in frames:
+		var v := int(sin(TAU * 440.0 * i / RATE) * 4000000.0)
+		for c in 2:
+			data.encode_s16(i * 6 + c * 3, v & 0xFFFF)
+			data.encode_s8(i * 6 + c * 3 + 2, v >> 16)
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_buffer("RIFF".to_ascii_buffer())
+	f.store_32(4 + 48 + 8 + data.size() + 12)
+	f.store_buffer("WAVEfmt ".to_ascii_buffer())
+	f.store_32(40)
+	f.store_16(0xFFFE)
+	f.store_16(2)
+	f.store_32(RATE)
+	f.store_32(RATE * 6)
+	f.store_16(6)
+	f.store_16(24)
+	f.store_16(22)
+	f.store_16(24)
+	f.store_32(3)
+	f.store_buffer(PackedByteArray([1, 0, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xAA, 0, 0x38, 0x9B, 0x71]))
+	f.store_buffer("data".to_ascii_buffer())
+	f.store_32(data.size())
+	f.store_buffer(data)
+	f.store_buffer("junk".to_ascii_buffer())
+	f.store_32(3)
+	f.store_buffer(PackedByteArray([1, 2, 3, 0]))
+	f.close()
+
+	_check(WavHeader.needs_fix(path), "an EXTENSIBLE 24-bit WAV is flagged for a header fix")
+	_check(not WavHeader.needs_fix(WAV), "a plain PCM WAV is left alone")
+	var before := FileAccess.get_file_as_bytes(path)
+	_check(WavHeader.fix(path) == OK, "its header is rewritten")
+	var after := FileAccess.get_file_as_bytes(path)
+	_check(not WavHeader.needs_fix(path) and after.decode_u16(20) == 1 and after.decode_u32(16) == 16,
+			"as a plain 16-byte PCM fmt chunk")
+	_check(after.decode_u32(4) == after.size() - 8, "with a correct RIFF size")
+	_check(after.slice(36, 44 + data.size()) == before.slice(60, 68 + data.size()), "and the samples unchanged")
+	var stream := AudioStreamWAV.load_from_file(path)
+	_check(stream != null, "Godot loads the fixed file")
+	var analysis := ZtripAnalysis.new()
+	_check(analysis.load_file(path) == OK, "ztrip still analyses it: " + analysis.get_error())
 
 
 func _write_graph(path: String, gain: float, light_target: String) -> void:

@@ -15,6 +15,7 @@ add_executable(ztrip_tests
   test_envelope.cpp
   test_onsets.cpp
   test_kick.cpp
+  test_snare.cpp
   test_beats.cpp
   test_pipeline.cpp
   test_reference_tracks.cpp
