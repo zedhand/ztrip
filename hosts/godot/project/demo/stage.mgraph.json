@@ -1,0 +1,68 @@
+{
+  "format": "ztrip.mgraph",
+  "version": 1,
+  "name": "Demo stage",
+  "nodes": [
+    {"id": "kick", "type": "AudioOnset", "params": {"band": "Sub", "min_velocity": 0.3}, "pos": [0, 0]},
+    {"id": "kick_flash", "type": "ImpulseDecay", "params": {"decay_ms": 180}, "pos": [240, 0]},
+    {"id": "kick_gain", "type": "Multiply", "params": {"b": 14}, "pos": [480, 0]},
+    {"id": "kick_light", "type": "PropertyOut", "params": {"target": "Lights/Kick:light_energy"}, "pos": [720, 0]},
+
+    {"id": "snare", "type": "AudioOnset", "params": {"band": "Mid", "min_velocity": 0.35}, "pos": [0, 160]},
+    {"id": "snare_flash", "type": "ImpulseDecay", "params": {"decay_ms": 220}, "pos": [240, 160]},
+    {"id": "snare_gain", "type": "Multiply", "params": {"b": 20}, "pos": [480, 160]},
+    {"id": "snare_light", "type": "PropertyOut", "params": {"target": "Lights/Snare:light_energy"}, "pos": [720, 160]},
+
+    {"id": "hats", "type": "AudioOnset", "params": {"band": "Air", "min_velocity": 0.4}, "pos": [0, 320]},
+    {"id": "hats_flash", "type": "ImpulseDecay", "params": {"decay_ms": 70}, "pos": [240, 320]},
+    {"id": "hats_gain", "type": "Multiply", "params": {"b": 4}, "pos": [480, 320]},
+    {"id": "hats_light", "type": "PropertyOut", "params": {"target": "Lights/Hats:light_energy"}, "pos": [720, 320]},
+
+    {"id": "bass", "type": "AudioBand", "params": {"band": "Bass"}, "pos": [0, 480]},
+    {"id": "bass_curve", "type": "ResponseCurve", "params": {"curve": "ease_in", "amount": 2}, "pos": [240, 480]},
+    {"id": "bass_glow", "type": "RemapRange", "params": {"out_min": 0.1, "out_max": 6}, "pos": [480, 480]},
+    {"id": "orb_glow", "type": "PropertyOut", "params": {"target": "Orb:material_override:shader_parameter/glow"}, "pos": [720, 480]},
+
+    {"id": "clock", "type": "BeatClock", "pos": [0, 680]},
+    {"id": "orb_pulse", "type": "PropertyOut", "params": {"target": "Orb:material_override:shader_parameter/pulse"}, "pos": [720, 640]},
+    {"id": "bar_push", "type": "ImpulseDecay", "params": {"decay_ms": 450, "velocity": false}, "pos": [240, 760]},
+    {"id": "fov", "type": "RemapRange", "params": {"out_min": 62, "out_max": 50}, "pos": [480, 760]},
+    {"id": "cam_fov", "type": "PropertyOut", "params": {"target": "Camera:fov"}, "pos": [720, 760]},
+    {"id": "sway", "type": "BeatLFO", "params": {"shape": "sine", "beats": 8}, "pos": [240, 920]},
+    {"id": "sway_range", "type": "RemapRange", "params": {"out_min": -0.8, "out_max": 0.8}, "pos": [480, 920]},
+    {"id": "cam_x", "type": "PropertyOut", "params": {"target": "Camera:position:x"}, "pos": [720, 920]},
+
+    {"id": "loudness", "type": "AudioBand", "params": {"signal": "rms"}, "pos": [0, 1080]},
+    {"id": "ambient", "type": "RemapRange", "params": {"out_min": 0.05, "out_max": 0.5}, "pos": [480, 1080]},
+    {"id": "env_ambient", "type": "PropertyOut", "params": {"target": "Environment:environment:ambient_light_energy"}, "pos": [720, 1080]}
+  ],
+  "edges": [
+    {"from": "kick.trigger", "to": "kick_flash.trigger"},
+    {"from": "kick_flash.out", "to": "kick_gain.a"},
+    {"from": "kick_gain.out", "to": "kick_light.in"},
+    {"from": "snare.trigger", "to": "snare_flash.trigger"},
+    {"from": "snare_flash.out", "to": "snare_gain.a"},
+    {"from": "snare_gain.out", "to": "snare_light.in"},
+    {"from": "hats.trigger", "to": "hats_flash.trigger"},
+    {"from": "hats_flash.out", "to": "hats_gain.a"},
+    {"from": "hats_gain.out", "to": "hats_light.in"},
+    {"from": "bass.out", "to": "bass_curve.in"},
+    {"from": "bass_curve.out", "to": "bass_glow.in"},
+    {"from": "bass_glow.out", "to": "orb_glow.in"},
+    {"from": "clock.beat_phase", "to": "orb_pulse.in"},
+    {"from": "clock.bar", "to": "bar_push.trigger"},
+    {"from": "bar_push.out", "to": "fov.in"},
+    {"from": "fov.out", "to": "cam_fov.in"},
+    {"from": "clock.clock", "to": "sway.clock"},
+    {"from": "sway.out", "to": "sway_range.in"},
+    {"from": "sway_range.out", "to": "cam_x.in"},
+    {"from": "loudness.out", "to": "ambient.in"},
+    {"from": "ambient.out", "to": "env_ambient.in"}
+  ],
+  "macros": [
+    {"name": "KickLight", "node": "kick_gain", "param": "b", "min": 0, "max": 32, "default": 14},
+    {"name": "SnareLight", "node": "snare_gain", "param": "b", "min": 0, "max": 40, "default": 20},
+    {"name": "BassGlow", "node": "bass_glow", "param": "out_max", "min": 0, "max": 12, "default": 6},
+    {"name": "CameraPushFov", "node": "fov", "param": "out_max", "min": 30, "max": 62, "default": 50}
+  ]
+}

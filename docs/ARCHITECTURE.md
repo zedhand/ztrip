@@ -26,9 +26,9 @@ core/            C++20 library, no engine headers
   time/          tempo map, note sequences
   io/            ISignalSource adapters: audio, MIDI, OSC, DMX, gamepad
   serialize/     JSON schemas + migrations, sigcache
-hosts/           (later phases)
-  unreal/        Runtime + Editor modules, Sequencer track, binder
-  godot/         GDExtension + editor plugin, timeline dock, binder
+hosts/
+  godot/         GDExtension (src/), addon + demo Godot project (project/)
+  unreal/        (later) Runtime + Editor modules, Sequencer track, binder
 tools/
   analyze-cli/   offline analysis + plot dump for tuning
 examples/        sample .mgraph.json graphs
@@ -48,7 +48,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-Options: `ZTRIP_BUILD_TOOLS` and `ZTRIP_BUILD_TESTS` (both `ON` by default). Catch2 is fetched at configure time unless an installed Catch2 3.x is found; pffft (v1.1.0, the FFT) is always fetched and only its float FFT sources are compiled; nlohmann/json (3.11.3) is fetched unless an installed 3.11+ is found.
+Options: `ZTRIP_BUILD_TOOLS` and `ZTRIP_BUILD_TESTS` (both `ON` by default), and `ZTRIP_BUILD_GODOT` (`OFF`; the `godot` preset turns it on) for the Godot host. Catch2 is fetched at configure time unless an installed Catch2 3.x is found; pffft (v1.1.0, the FFT) is always fetched and only its float FFT sources are compiled; nlohmann/json (3.11.3) is fetched unless an installed 3.11+ is found.
 
 ## Threading
 
@@ -108,6 +108,15 @@ Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of
 7. **Live mode:** the same nodes with `live` set, no checkpoints; a backwards jump resets state instead of replaying.
 
 `Evaluator::outputs()` lists each `PropertyOut` target and value; `port_value(node, port)` reads any port for previews.
+
+## Godot host (Phase 3)
+
+`hosts/godot/` is a GDExtension built with godot-cpp (`godot-4.5-stable` bindings, so it loads in Godot 4.5 and newer). It links `ztrip_core` statically into one shared library, written to `hosts/godot/project/addons/ztrip/bin/`. See [hosts/godot/README.md](../hosts/godot/README.md) for usage.
+
+- **`ZtripPlayer` (Node):** reads the WAV behind an AudioStreamPlayer (or a file), analyses it on a worker thread (cached as `user://ztrip_cache/<audio hash>.sigcache`), loads and compiles the `.mgraph.json`, and binds the analysis to the graph's `main` slot. Each frame (in the editor too, through internal processing) it takes the song time from the stream player's playback position (plus the time since the last mix, minus output latency; exact in Movie Maker mode), evaluates the graph there and hands `outputs()` to the binder. Without a playing stream, time advances by frame delta or follows `time`/`seek()`. Macros are dynamic `macros/<name>` properties. The graph file is polled for changes and hot-swapped with `Evaluator::swap_graph`, so state and macro values persist.
+- **Property binder:** a target `<node path>:<property path>` resolves once to an object id and an indexed property path (`Object.set_indexed`, so `material_override:shader_parameter/glow` and `position:x` work), plus `@globals:<name>` for global shader parameters. Floats, ints and bools are written; the value before the first write is kept and restored when the player is turned off, leaves the tree, reloads its graph, or the editor saves the scene (`NOTIFICATION_EDITOR_PRE_SAVE`).
+- **Editor:** an EditorPlugin (GDScript) adds a Motion Graph bottom panel: GraphEdit over the document, with the node catalog, port types and diagnostics from `ZtripGraphTools` and live port values read from the `ZtripPlayer` that plays the file. Saving goes through the core's `write_mgraph`.
+- **Tests:** `project/tests/test_host.gd` runs headless in CI on Linux and Windows against Godot 4.5.1 and 4.7.2.
 
 ## Musical time (Phase 4, core)
 
