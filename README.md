@@ -1,0 +1,2 @@
+# ztrip
+Audio frequency visualizer
