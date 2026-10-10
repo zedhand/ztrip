@@ -17,8 +17,14 @@ add_executable(ztrip_tests
   test_beats.cpp
   test_pipeline.cpp
   test_reference_tracks.cpp
+  test_graph_compile.cpp
+  test_graph_nodes.cpp
+  test_graph_determinism.cpp
+  test_graph_reference.cpp
+  test_mgraph.cpp
 )
 target_link_libraries(ztrip_tests PRIVATE ztrip::core Catch2::Catch2WithMain)
+target_compile_definitions(ztrip_tests PRIVATE ZTRIP_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 ztrip_set_warnings(ztrip_tests)
 
 include(Catch)
