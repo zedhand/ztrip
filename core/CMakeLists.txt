@@ -22,11 +22,14 @@ add_library(ztrip_core STATIC
   serialize/tempo.cpp
 )
 add_library(ztrip::core ALIAS ztrip_core)
+set_target_properties(ztrip_core PROPERTIES EXPORT_NAME core)
 
 target_include_directories(ztrip_core PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(ztrip_core PUBLIC cxx_std_20)
-target_compile_definitions(ztrip_core PRIVATE ZTRIP_VERSION_STRING="${PROJECT_VERSION}")
-target_link_libraries(ztrip_core PRIVATE ztrip_pffft nlohmann_json::nlohmann_json)
+target_compile_definitions(ztrip_core PRIVATE ZTRIP_VERSION_STRING="${ZTRIP_VERSION_FULL}")
+# nlohmann_json is header-only and private, so installed consumers never need it.
+target_link_libraries(ztrip_core PRIVATE ztrip_pffft $<BUILD_INTERFACE:nlohmann_json::nlohmann_json>)
 ztrip_set_warnings(ztrip_core)
