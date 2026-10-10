@@ -10,6 +10,13 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(mre_tests
   test_smoke.cpp
+  test_wav.cpp
+  test_stft.cpp
+  test_envelope.cpp
+  test_onsets.cpp
+  test_beats.cpp
+  test_pipeline.cpp
+  test_reference_tracks.cpp
 )
 target_link_libraries(mre_tests PRIVATE mre::core Catch2::Catch2WithMain)
 mre_set_warnings(mre_tests)
