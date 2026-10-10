@@ -17,11 +17,11 @@ add_library(ztrip_pffft STATIC
   ${pffft_SOURCE_DIR}/src/pffft_common.c
 )
 target_include_directories(ztrip_pffft
-  PUBLIC  ${pffft_SOURCE_DIR}/include/pffft
+  PUBLIC  $<BUILD_INTERFACE:${pffft_SOURCE_DIR}/include/pffft>
   PRIVATE ${pffft_SOURCE_DIR}/src
 )
 target_compile_definitions(ztrip_pffft PUBLIC PFFFT_STATIC_DEFINE PRIVATE _USE_MATH_DEFINES)
-set_target_properties(ztrip_pffft PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(ztrip_pffft PROPERTIES POSITION_INDEPENDENT_CODE ON EXPORT_NAME pffft)
 
 # nlohmann/json: .mgraph.json (and later project/sequence) load and save.
 # Header-only and used privately by ztrip_core; the release tarball skips the

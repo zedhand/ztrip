@@ -69,6 +69,7 @@ for (const auto& o : ev.outputs()) set_property(o.target, o.value);
 - [NODES.md](docs/NODES.md): Motion Graph node reference
 - [hosts/godot/README.md](hosts/godot/README.md): the Godot addon
 - [DECISIONS.md](docs/DECISIONS.md): design decisions and why
+- [RELEASING.md](docs/RELEASING.md): versioning, beta downloads and cutting a release
 
 ## Feedback
 
