@@ -8,6 +8,8 @@
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <exception>
 #include <system_error>
@@ -88,6 +90,8 @@ void ZtripAnalysis::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_signal_names"), &ZtripAnalysis::get_signal_names);
     ClassDB::bind_method(D_METHOD("get_event_names"), &ZtripAnalysis::get_event_names);
     ClassDB::bind_method(D_METHOD("sample", "signal", "time"), &ZtripAnalysis::sample);
+    ClassDB::bind_method(D_METHOD("get_signal_peaks", "signal", "t0", "t1", "count"),
+                         &ZtripAnalysis::get_signal_peaks);
     ClassDB::bind_method(D_METHOD("get_event_times", "events"), &ZtripAnalysis::get_event_times);
     ClassDB::bind_method(D_METHOD("get_event_velocities", "events"), &ZtripAnalysis::get_event_velocities);
     ClassDB::bind_method(D_METHOD("get_beats"), &ZtripAnalysis::get_beats);
@@ -136,6 +140,32 @@ double ZtripAnalysis::sample(const String& signal, double t) const {
     if (!result_) return 0.0;
     const auto* s = result_->find_signal(to_std(signal));
     return s ? result_->sample(*s, t) : 0.0;
+}
+
+PackedFloat32Array ZtripAnalysis::get_signal_peaks(const String& signal, double t0, double t1, int count) const {
+    PackedFloat32Array out;
+    if (count <= 0 || !(t1 > t0)) return out;
+    out.resize(count);
+    out.fill(0.0f);
+    if (!result_) return out;
+    const auto* s = result_->find_signal(to_std(signal));
+    if (!s || s->values.empty()) return out;
+    const double rate = result_->signal_rate_hz;
+    const auto n = static_cast<int64_t>(s->values.size());
+    const double slice = (t1 - t0) / count;
+    for (int i = 0; i < count; ++i) {
+        const double a = t0 + i * slice;
+        // Each slice covers at least one sample, so zoomed-in views interpolate.
+        auto first = static_cast<int64_t>(std::floor(a * rate));
+        auto last = static_cast<int64_t>(std::ceil((a + slice) * rate));
+        if (last < 0 || first >= n) continue;
+        first = std::max<int64_t>(first, 0);
+        last = std::min<int64_t>(std::max(last, first + 1), n);
+        float peak = 0.0f;
+        for (int64_t k = first; k < last; ++k) peak = std::max(peak, s->values[static_cast<std::size_t>(k)]);
+        out.set(i, peak);
+    }
+    return out;
 }
 
 PackedFloat64Array ZtripAnalysis::get_event_times(const String& events) const {

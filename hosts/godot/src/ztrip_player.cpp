@@ -10,6 +10,7 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/variant/callable_method_pointer.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
@@ -31,7 +32,10 @@ bool in_editor() { return Engine::get_singleton()->is_editor_hint(); }
 
 } // namespace
 
-ZtripPlayer::ZtripPlayer() = default;
+ZtripPlayer::ZtripPlayer() {
+    timeline_.instantiate();
+    timeline_->connect("changed", callable_mp(this, &ZtripPlayer::on_timeline_changed));
+}
 
 ZtripPlayer::~ZtripPlayer() {
     if (pending_.valid()) pending_.wait();
@@ -44,6 +48,10 @@ void ZtripPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_audio_file"), &ZtripPlayer::get_audio_file);
     ClassDB::bind_method(D_METHOD("set_graph_file", "path"), &ZtripPlayer::set_graph_file);
     ClassDB::bind_method(D_METHOD("get_graph_file"), &ZtripPlayer::get_graph_file);
+    ClassDB::bind_method(D_METHOD("set_tempo_file", "path"), &ZtripPlayer::set_tempo_file);
+    ClassDB::bind_method(D_METHOD("get_tempo_file"), &ZtripPlayer::get_tempo_file);
+    ClassDB::bind_method(D_METHOD("set_sequence_file", "path"), &ZtripPlayer::set_sequence_file);
+    ClassDB::bind_method(D_METHOD("get_sequence_file"), &ZtripPlayer::get_sequence_file);
     ClassDB::bind_method(D_METHOD("set_target_root", "path"), &ZtripPlayer::set_target_root);
     ClassDB::bind_method(D_METHOD("get_target_root"), &ZtripPlayer::get_target_root);
     ClassDB::bind_method(D_METHOD("set_active", "active"), &ZtripPlayer::set_active);
@@ -72,6 +80,10 @@ void ZtripPlayer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_duration"), &ZtripPlayer::get_duration);
     ClassDB::bind_method(D_METHOD("get_bpm"), &ZtripPlayer::get_bpm);
     ClassDB::bind_method(D_METHOD("get_analysis"), &ZtripPlayer::get_analysis);
+    ClassDB::bind_method(D_METHOD("get_timeline"), &ZtripPlayer::get_timeline);
+    ClassDB::bind_method(D_METHOD("reload_timeline"), &ZtripPlayer::reload_timeline);
+    ClassDB::bind_method(D_METHOD("draft_timeline", "grid"), &ZtripPlayer::draft_timeline, DEFVAL("1/16"));
+    ClassDB::bind_method(D_METHOD("save_timeline"), &ZtripPlayer::save_timeline);
     ClassDB::bind_method(D_METHOD("get_resolved_audio_file"), &ZtripPlayer::get_resolved_audio_file);
     ClassDB::bind_method(D_METHOD("get_output", "target"), &ZtripPlayer::get_output);
     ClassDB::bind_method(D_METHOD("get_outputs"), &ZtripPlayer::get_outputs);
@@ -91,6 +103,11 @@ void ZtripPlayer::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "graph_file", PROPERTY_HINT_FILE, "*.mgraph.json"),
                  "set_graph_file", "get_graph_file");
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "target_root"), "set_target_root", "get_target_root");
+    ADD_GROUP("Timeline", "");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "tempo_file", PROPERTY_HINT_SAVE_FILE, "*.tempo.json"),
+                 "set_tempo_file", "get_tempo_file");
+    ADD_PROPERTY(PropertyInfo(Variant::STRING, "sequence_file", PROPERTY_HINT_SAVE_FILE, "*.nseq.json"),
+                 "set_sequence_file", "get_sequence_file");
     ADD_GROUP("Playback", "");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "active"), "set_active", "is_active");
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "playing", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_EDITOR),
@@ -108,6 +125,7 @@ void ZtripPlayer::_bind_methods() {
 
     ADD_SIGNAL(MethodInfo("analysis_loaded"));
     ADD_SIGNAL(MethodInfo("graph_loaded"));
+    ADD_SIGNAL(MethodInfo("timeline_loaded"));
     ADD_SIGNAL(MethodInfo("finished"));
 }
 
@@ -132,6 +150,19 @@ void ZtripPlayer::set_graph_file(const String& path) {
     graph_file_ = path;
     if (is_node_ready()) reload_graph();
     update_configuration_warnings();
+}
+
+void ZtripPlayer::set_tempo_file(const String& path) {
+    if (path == tempo_file_) return;
+    tempo_file_ = path;
+    // A new path with no file yet keeps the timeline, ready to be saved there.
+    if (is_node_ready() && FileAccess::file_exists(path)) reload_timeline();
+}
+
+void ZtripPlayer::set_sequence_file(const String& path) {
+    if (path == sequence_file_) return;
+    sequence_file_ = path;
+    if (is_node_ready() && FileAccess::file_exists(path)) reload_timeline();
 }
 
 void ZtripPlayer::set_target_root(const NodePath& path) {
@@ -187,6 +218,17 @@ String ZtripPlayer::get_status() const {
                                                 static_cast<int64_t>(g.macros.size()))));
     } else if (graph_error_.is_empty()) {
         lines.push_back("No graph: set graph_file.");
+    }
+    if (!timeline_error_.is_empty()) lines.push_back("Timeline: " + timeline_error_);
+    if (has_tempo_) {
+        PackedStringArray lanes;
+        for (const auto& l : timeline_->sequence().lanes)
+            lanes.push_back(String("{0} {1}").format(Array::make(to_godot(l.name), static_cast<int64_t>(l.notes.size()))));
+        lines.push_back(String("Timeline: {0} BPM at bar 1, offset {1} s{2}; notes: {3}")
+                            .format(Array::make(String::num(timeline_->bpm_at(0.0), 2),
+                                                String::num(timeline_->get_offset() + timeline_->get_nudge(), 3),
+                                                tempo_from_file_ ? "" : " (drafted)",
+                                                lanes.is_empty() ? String("none") : String(", ").join(lanes))));
     }
     for (const auto& w : graph_warnings_) lines.push_back("Graph warning: " + w);
     for (const auto& p : binder_.problems()) lines.push_back("Target " + p);
@@ -284,6 +326,7 @@ String ZtripPlayer::resolve_audio_file() const {
 }
 
 void ZtripPlayer::reload() {
+    reload_timeline();
     start_analysis();
     reload_graph();
 }
@@ -340,6 +383,15 @@ void ZtripPlayer::finish_analysis(ztrip::godot_host::AnalysisOutcome outcome) {
     resolved_audio_file_ = pending_file_;
     analysis_ref_.instantiate();
     analysis_ref_->set_result(analysis_, resolved_audio_file_, outcome.from_cache);
+    // A new song gets a fresh draft of whatever didn't come from a file.
+    if (resolved_audio_file_ != timeline_song_ || !has_tempo_) {
+        timeline_song_ = resolved_audio_file_;
+        if (!tempo_from_file_) timeline_->draft_tempo(analysis_ref_);
+        if (!sequence_from_file_) timeline_->draft_notes(analysis_ref_);
+        has_tempo_ = true;
+        bind_timeline();
+        emit_signal("timeline_loaded");
+    }
     set_status_changed();
     evaluate_and_apply();
     emit_signal("analysis_loaded");
@@ -385,6 +437,7 @@ void ZtripPlayer::reload_graph() {
         } else {
             evaluator_ = std::make_unique<ztrip::graph::Evaluator>(std::move(compiled.graph));
             evaluator_->bind_source("main", analysis_.get());
+            bind_timeline();
         }
     } catch (const std::exception& e) {
         graph_error_ = graph_file_.get_file() + ": " + to_godot(e.what());
@@ -402,6 +455,88 @@ void ZtripPlayer::reload_graph() {
     set_status_changed();
     evaluate_and_apply();
     emit_signal("graph_loaded");
+}
+
+// ---- Timeline ------------------------------------------------------------------
+
+void ZtripPlayer::reload_timeline() {
+    timeline_error_ = String();
+    tempo_from_file_ = false;
+    sequence_from_file_ = false;
+    if (!tempo_file_.is_empty() && FileAccess::file_exists(tempo_file_)) {
+        if (timeline_->load_tempo(tempo_file_) == OK) {
+            tempo_from_file_ = true;
+            has_tempo_ = true;
+        } else {
+            timeline_error_ = timeline_->get_error();
+        }
+    }
+    if (!sequence_file_.is_empty() && FileAccess::file_exists(sequence_file_)) {
+        if (timeline_->load_sequence(sequence_file_) == OK) {
+            sequence_from_file_ = true;
+        } else {
+            timeline_error_ = timeline_->get_error();
+        }
+    }
+    if (!timeline_error_.is_empty()) UtilityFunctions::push_warning("ZtripPlayer: ", timeline_error_);
+    // Draft what is missing now if the song is already analysed, else when it is.
+    if (analysis_ref_.is_valid()) {
+        if (!tempo_from_file_) timeline_->draft_tempo(analysis_ref_);
+        if (!sequence_from_file_) timeline_->draft_notes(analysis_ref_);
+        has_tempo_ = true;
+        timeline_song_ = resolved_audio_file_;
+    }
+    bind_timeline();
+    set_status_changed();
+    emit_signal("timeline_loaded");
+}
+
+Error ZtripPlayer::draft_timeline(const String& grid) {
+    if (analysis_ref_.is_null()) {
+        timeline_error_ = "Nothing to draft from: the song isn't analysed yet.";
+        set_status_changed();
+        return ERR_UNCONFIGURED;
+    }
+    timeline_->draft_tempo(analysis_ref_);
+    const Error err = timeline_->draft_notes(analysis_ref_, grid);
+    timeline_error_ = err == OK ? String() : timeline_->get_error();
+    has_tempo_ = true;
+    timeline_song_ = resolved_audio_file_;
+    bind_timeline();
+    set_status_changed();
+    emit_signal("timeline_loaded");
+    return err;
+}
+
+Error ZtripPlayer::save_timeline() {
+    if (tempo_file_.is_empty() || sequence_file_.is_empty()) {
+        timeline_error_ = "Set tempo_file and sequence_file to save the timeline.";
+        set_status_changed();
+        return ERR_FILE_BAD_PATH;
+    }
+    Error err = timeline_->save_tempo(tempo_file_);
+    if (err == OK) err = timeline_->save_sequence(sequence_file_);
+    timeline_error_ = err == OK ? String() : timeline_->get_error();
+    if (err == OK) {
+        // What is on disk now is what the user authored: keep it across re-analysis.
+        tempo_from_file_ = true;
+        sequence_from_file_ = true;
+    }
+    set_status_changed();
+    return err;
+}
+
+void ZtripPlayer::bind_timeline() {
+    if (!evaluator_) return;
+    evaluator_->bind_tempo("main", has_tempo_ ? &timeline_->tempo() : nullptr);
+    evaluator_->bind_sequence("main", &timeline_->sequence());
+}
+
+void ZtripPlayer::on_timeline_changed() {
+    // Nodes resolve notes to seconds when bound, and an edit may have moved
+    // the notes in memory, so rebind before anything evaluates again.
+    bind_timeline();
+    if (is_node_ready()) evaluate_and_apply();
 }
 
 void ZtripPlayer::set_status_changed() {
