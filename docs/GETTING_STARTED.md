@@ -61,7 +61,7 @@ The analyser ends up at `build\release\tools\analyze-cli\analyze-cli.exe`.
 
 ### 1. Get a WAV file
 
-Only WAV is supported for now (16/24/32-bit PCM or float, any sample rate, mono or stereo). To convert an MP3, FLAC or OGG, use [ffmpeg](https://ffmpeg.org/) or Audacity (File > Export > Export as WAV):
+Only WAV is supported for now (8/16/24/32-bit PCM or float, any sample rate, any number of channels). If you pass an MP3, FLAC or OGG file, `analyze-cli` stops and says so. To convert an MP3, FLAC or OGG, use [ffmpeg](https://ffmpeg.org/) or Audacity (File > Export > Export as WAV):
 
 ```sh
 ffmpeg -i song.mp3 song.wav
@@ -91,10 +91,13 @@ tempo     128.00 BPM, 128 beats, 32 downbeats
 onset.Sub        131
 onset.Bass       195
 ...
+kick             112
+tempo map song-analysis/song.tempo.json (1 segments)
+lane      Kick: 112 notes -> song-analysis/song.nseq.json
 plots     python3 song-analysis/plot.py
 ```
 
-The first thing to check is the **tempo** line. If you know the song's BPM, compare. Getting half or double the real tempo (64 or 256 instead of 128) is a known failure mode worth reporting.
+The first thing to check is the **tempo** line. If you know the song's BPM, compare. Getting half or double the real tempo (64 or 256 instead of 128) is a known failure mode worth reporting. The `kick` line counts the kick drum hits it found.
 
 ### 3. Look at the result
 
@@ -106,19 +109,23 @@ The output folder holds:
 | `signals.csv` | 120 values per second for each band level (`band.Sub` ... `band.Air`), its smoothed envelope (`env.*`), overall loudness (`rms`) and brightness (`centroid`). All are 0 to 1. |
 | `events.csv` | Every detected onset per band, plus each beat and downbeat, with a time in seconds and a strength from 0 to 1. |
 | `beats.csv` | The beat grid: time, bar number, beat number in the bar, and whether it is a downbeat. |
+| `<name>.tempo.json` | The tempo map: the song's tempo, bar by bar, fitted to the detected beats. |
+| `<name>.nseq.json` | A Note Sequence with a Kick lane: one note per detected kick, snapped to a 1/16 grid. |
+| `kick_clicks.wav` | Only with `--clicks`: the song with a click on every note of the Kick lane. |
 | `plot.py` | A script that draws all of the above as a picture. |
 
-To see it as a picture, install Python 3 with numpy and matplotlib once (`python3 -m pip install numpy matplotlib`; on Windows use `py` instead of `python3`), then:
+To see it as a picture, install Python 3 with numpy and matplotlib once. On Ubuntu or Debian use `sudo apt install python3-numpy python3-matplotlib` (plain `pip install` is blocked there). On Windows, install Python from [python.org](https://www.python.org/downloads/) and run `py -m pip install numpy matplotlib`. Then (on Windows, `py` instead of `python3`):
 
 ```sh
 python3 song-analysis/plot.py --start 30 --end 45
 ```
 
-That writes `song-analysis/analysis.png` for 30 s to 45 s of the song. There is one row per band, from Sub (deep bass, 20-60 Hz) up to Air (cymbal shimmer, 6-20 kHz), and a bottom row with loudness and the beat grid. In each band row, the light fill is the level, the dark line is the envelope, and red ticks are detected hits. Dashed grey lines mark the start of each bar.
+That writes `song-analysis/analysis.png` for 30 s to 45 s of the song. There is one row per band, from Sub (deep bass, 20-60 Hz) up to Air (cymbal shimmer, 6-20 kHz), and a bottom row with loudness and the beat grid. In each band row, the light fill is the level, the dark line is the envelope, and red ticks are detected hits. Orange triangles along the top of the Sub row are the kicks. Dashed grey lines mark the start of each bar.
 
 Quick checks that need no musical training:
 
-- **Kicks:** in a song with a steady kick drum, the Sub and Bass rows should show a red tick on every kick, evenly spaced.
+- **Kicks:** in a song with a steady kick drum, the Sub row should show an orange triangle on every kick, evenly spaced.
+- **Kicks by ear:** run again with `--clicks` and play `kick_clicks.wav`. Each click should land on a kick drum hit. Clicks with no kick under them, or kicks with no click, are worth reporting.
 - **Hi-hats and cymbals:** these show up in the HighMid and Air rows as dense, regular ticks.
 - **Beats:** the green ticks in the bottom row should be evenly spaced and, if you play the song and tap along, line up with your taps. Orange ticks (downbeats) should land on the "1" of each bar.
 - **Quiet parts:** in a breakdown, the levels should drop and the ticks should thin out.
@@ -132,6 +139,8 @@ Run `analyze-cli --help` for the full list. The ones most worth trying:
 | `--bpm-prior BPM` | 120 | The tempo comes out at half or double the real one. Set this near the real BPM. |
 | `--sensitivity X` | 1.5 | Too many red ticks: raise it. Hits are missed: lower it. |
 | `--min-gap MS` | 50 | Fast rolls are merged into one hit: lower it. |
+| `--kick-rise DB` | 12 | Clicks with no kick under them: raise it. Kicks are missed: lower it. |
+| `--nudge MS` | 0 | Every click is early or late by the same amount: shift them (positive is later). |
 | `--release MS` | 150 | Envelopes fall too slowly (lights would linger): lower it. |
 | `--beats-per-bar N` | 4 | Songs in 3/4 or 6/8. |
 | `--fft N` | 2048 | Larger sizes separate low frequencies better but blur timing. |
