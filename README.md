@@ -13,7 +13,8 @@ Under the hood it is an engine-agnostic C++20 core with a Godot 4 host in progre
 | Audio analysis: bands, envelopes, onsets, tempo, beat grid, `analyze-cli` | Done |
 | Motion Graph core: compiler, evaluator, 15 nodes, `.mgraph.json` | Done |
 | Godot 4 addon: property binder, graph editor, song playback | In progress |
-| Musical time: tempo map, note lanes, timeline | In progress |
+| Musical time core: tempo map, Note Sequences, auto-drafted kick lane, `NoteLane` node | Done |
+| Musical time: timeline dock in Godot | Planned for beta |
 | Live input: mic, MIDI, OSC, DMX | After beta |
 | Unreal Engine plugin | After beta |
 
@@ -38,7 +39,7 @@ build/release/tools/analyze-cli/analyze-cli song.wav -o song-analysis
 python3 song-analysis/plot.py --start 30 --end 45   # needs numpy + matplotlib
 ```
 
-This writes a `.sigcache`, CSVs of the 120 Hz band levels, envelopes, onsets and beat grid, and a plot script. `analyze-cli --help` lists the tuning options (FFT size, window, attack/release, onset sensitivity, tempo prior). [GETTING_STARTED.md](docs/GETTING_STARTED.md#analyse-a-song) explains how to read the output.
+This writes a `.sigcache`, CSVs of the 120 Hz band levels, envelopes, onsets and beat grid, a plot script, a tempo map (`.tempo.json`) and a Note Sequence with an auto-drafted Kick lane (`.nseq.json`). Add `--clicks` to also get `kick_clicks.wav`, the track with a click on each drafted kick. `analyze-cli --help` lists the tuning options (FFT size, window, attack/release, onset sensitivity, tempo prior). [GETTING_STARTED.md](docs/GETTING_STARTED.md#analyse-a-song) explains how to read the output.
 
 Accuracy tests against the reference tracks run when `ZTRIP_REFERENCE_TRACKS` points at a folder holding them; otherwise they are skipped.
 
@@ -51,6 +52,16 @@ ztrip::graph::Evaluator ev(std::move(compiled.graph));
 ev.bind_source("main", &analysis);                   // an analysis::AnalysisResult
 ev.evaluate(t);                                      // any time, any order: seeking is deterministic
 for (const auto& o : ev.outputs()) set_property(o.target, o.value);
+```
+
+Note Sequences reach a graph through `NoteLane` nodes:
+
+```cpp
+auto tempo = ztrip::time::tempo_map_from_beats(analysis.beats);
+tempo.nudge_by(0.010);                               // 10 ms later, by ear
+auto seq = ztrip::time::auto_draft(analysis, tempo); // or serialize::load_nseq("song.nseq.json")
+ev.bind_tempo("main", &tempo);
+ev.bind_sequence("main", &seq);
 ```
 
 ## Documentation
