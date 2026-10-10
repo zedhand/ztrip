@@ -147,6 +147,10 @@ overwrites edits made in the editor).
   and the timeline dock come in later phases.
 - Only a `template_debug` build of the library is made, and release exports
   load it too.
+- Quitting while a song plays (for example with `--quit-after`) prints
+  "ObjectDB instances leaked at exit" and "1 resources still in use at
+  exit" for the song. That comes from Godot itself (a plain project with an
+  AudioStreamPlayer does the same in 4.5.1 and 4.7.2) and is harmless.
 - Exported games analyse the song at start-up, so the original WAV must be in
   the export: add `*.wav` to the export preset's *Filters to export
   non-resource files*. The analysis cache lives in `user://ztrip_cache/`.
