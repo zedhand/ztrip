@@ -6,14 +6,15 @@ committed to this repository. Release archives carry this file.
 
 | Component | Version | License | Used for | In release binaries |
 | --- | --- | --- | --- | --- |
-| [pffft](https://github.com/marton78/pffft) | v1.1.0 | BSD-style (FFTPACK) | FFT in the analysis STFT | Yes (core library, cli, Godot addon) |
-| [nlohmann/json](https://github.com/nlohmann/json) | v3.11.3 | MIT | `.mgraph.json`, `.nseq.json`, `.tempo.json` files | Yes |
+| [pffft](https://github.com/marton78/pffft) | v1.1.0 | BSD-style (FFTPACK) | FFT in the analysis STFT | Yes (core library, cli, Godot addon; source in the Unreal plugin) |
+| [nlohmann/json](https://github.com/nlohmann/json) | v3.11.3 | MIT | `.mgraph.json`, `.nseq.json`, `.tempo.json` files | Yes (source in the Unreal plugin) |
 | [godot-cpp](https://github.com/godotengine/godot-cpp) | godot-4.5-stable | MIT | Godot GDExtension bindings | Yes (Godot addon) |
 | [miniaudio](https://github.com/mackron/miniaudio) | 0.11.22 | Public domain (Unlicense) or MIT-0 | Live audio capture | Yes (core library, live-cli, Godot addon) |
 | [RtMidi](https://github.com/thestk/rtmidi) | 6.0.0 | MIT-style | Live MIDI input | Yes (core library, live-cli, Godot addon) |
 | [Catch2](https://github.com/catchorg/Catch2) | v3.7.1 | BSL-1.0 | Unit tests | No (tests only) |
 
-The Godot engine itself is not bundled; the addon runs inside your own copy of
+The staged Unreal plugin carries pffft and nlohmann/json as source, with their
+license files, and this file. The Godot engine itself is not bundled; the addon runs inside your own copy of
 Godot, which is under the MIT license.
 
 No audio is distributed with ztrip. The reference tracks used for accuracy

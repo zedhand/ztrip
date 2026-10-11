@@ -28,6 +28,10 @@ add_library(ztrip_core STATIC
   time/autodraft.cpp
   serialize/nseq.cpp
   serialize/tempo.cpp
+  host/analysis_cache.cpp
+  host/session.cpp
+  host/bake.cpp
+  host/unreal_target.cpp
 )
 add_library(ztrip::core ALIAS ztrip_core)
 set_target_properties(ztrip_core PROPERTIES EXPORT_NAME core)

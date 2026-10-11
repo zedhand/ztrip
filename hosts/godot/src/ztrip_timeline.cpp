@@ -3,6 +3,7 @@
 #include "convert.h"
 #include "ztrip_analysis.h"
 
+#include "ztrip/host/analysis_cache.hpp"
 #include "ztrip/serialize/nseq.hpp"
 #include "ztrip/serialize/tempo.hpp"
 
@@ -65,12 +66,7 @@ Error write_text(const String& path, const String& text, String& error) {
 
 ZtripTimeline::ZtripTimeline() {
     sequence_.name = "main";
-    // Kick follows the dedicated kick detector when the analysis has it;
-    // snare and hats follow their bands' onsets, with the thresholds the
-    // demo graph used for its onset lights.
-    draft_lanes_ = {{"Kick", "kick", 0.0f, "onset.Sub"},
-                    {"Snare", "onset.Mid", 0.35f, ""},
-                    {"Hats", "onset.Air", 0.4f, ""}};
+    draft_lanes_ = ztrip::host::default_draft_lanes();
 }
 
 void ZtripTimeline::_bind_methods() {

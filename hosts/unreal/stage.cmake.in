@@ -1,0 +1,83 @@
+# Generated from hosts/unreal/stage.cmake.in: copies the Unreal plugin, the
+# ztrip core and its third-party sources into one plugin folder.
+set(SRC "@PROJECT_SOURCE_DIR@")
+set(OUT "@ZTRIP_UE_STAGE_DIR@/Ztrip")
+set(VERSION "@ZTRIP_VERSION_FULL@")
+set(PFFFT "@pffft_SOURCE_DIR@")
+set(JSON "@nlohmann_json_SOURCE_DIR@")
+set(CORE_SOURCES "@ZTRIP_UE_CORE_SOURCES@")
+set(PFFFT_SYMBOLS "@ZTRIP_UE_PFFFT_SYMBOLS@")
+
+set(MODULE "${OUT}/Source/ZtripRuntime")
+set(PLUGIN_SRC "${SRC}/hosts/unreal/Ztrip")
+
+file(REMOVE_RECURSE "${OUT}")
+file(MAKE_DIRECTORY "${OUT}")
+
+# The plugin itself, minus the templates filled in below.
+file(COPY "${PLUGIN_SRC}/" DESTINATION "${OUT}" PATTERN "*.in" EXCLUDE)
+file(COPY "${SRC}/hosts/unreal/README.md" "${SRC}/LICENSE" "${SRC}/THIRD_PARTY_NOTICES.md" DESTINATION "${OUT}")
+
+# The core: public headers next to the player's, sources under Private/Core.
+file(COPY "${SRC}/core/include/ztrip" DESTINATION "${MODULE}/Public")
+foreach(source IN LISTS CORE_SOURCES)
+  get_filename_component(dir "${source}" DIRECTORY)
+  file(COPY "${SRC}/core/${source}" DESTINATION "${MODULE}/Private/Core/${dir}")
+endforeach()
+# Private headers the core's sources include from their own folders.
+file(GLOB_RECURSE private_headers RELATIVE "${SRC}/core" "${SRC}/core/*.hpp" "${SRC}/core/*.h")
+foreach(header IN LISTS private_headers)
+  if(NOT header MATCHES "^include/")
+    get_filename_component(dir "${header}" DIRECTORY)
+    file(COPY "${SRC}/core/${header}" DESTINATION "${MODULE}/Private/Core/${dir}")
+  endif()
+endforeach()
+
+# pffft: the float FFT only, as in the CMake build.
+set(TP "${MODULE}/Private/ThirdParty")
+file(COPY "${PFFFT}/src/pffft.c" "${PFFFT}/src/pffft_common.c" "${PFFFT}/src/pffft_priv_impl.h"
+          DESTINATION "${TP}/pffft/src")
+file(COPY "${PFFFT}/src/simd" DESTINATION "${TP}/pffft/src")
+file(COPY "${PFFFT}/include/pffft/pffft.h" DESTINATION "${TP}/pffft/include")
+file(COPY "${PFFFT}/LICENSE.txt" DESTINATION "${TP}/pffft")
+# nlohmann/json: headers only.
+file(COPY "${JSON}/include/nlohmann" DESTINATION "${TP}/nlohmann_json/include")
+file(COPY "${JSON}/LICENSE.MIT" DESTINATION "${TP}/nlohmann_json")
+
+# What the module needs to build the core: include folders and defines.
+set(includes "Private/ThirdParty/pffft/include" "Private/ThirdParty/nlohmann_json/include")
+set(defines "PFFFT_STATIC_DEFINE" "_USE_MATH_DEFINES" "ZTRIP_VERSION_STRING=\"${VERSION}\"")
+foreach(symbol IN LISTS PFFFT_SYMBOLS)
+  list(APPEND defines "${symbol}=ztrip_${symbol}")
+endforeach()
+
+function(csharp_strings out)
+  set(items "")
+  foreach(value IN LISTS ARGN)
+    string(REPLACE "\\" "\\\\" value "${value}")
+    string(REPLACE "\"" "\\\"" value "${value}")
+    list(APPEND items "\"${value}\"")
+  endforeach()
+  list(JOIN items ", " joined)
+  set(${out} "${joined}" PARENT_SCOPE)
+endfunction()
+csharp_strings(ZTRIP_UE_PRIVATE_INCLUDES ${includes})
+csharp_strings(ZTRIP_UE_DEFINES ${defines})
+configure_file("${PLUGIN_SRC}/Source/ZtripRuntime/ZtripRuntime.Build.cs.in" "${MODULE}/ZtripRuntime.Build.cs" @ONLY)
+set(ZTRIP_VERSION_FULL "${VERSION}")
+configure_file("${PLUGIN_SRC}/Ztrip.uplugin.in" "${OUT}/Ztrip.uplugin" @ONLY)
+
+# The same settings for hosts/unreal/check, which builds the staged core the
+# way UnrealBuildTool would.
+set(module_cmake "set(ZTRIP_UE_INCLUDES")
+foreach(value IN LISTS includes)
+  string(APPEND module_cmake " [=[${value}]=]")
+endforeach()
+string(APPEND module_cmake ")\nset(ZTRIP_UE_DEFINES")
+foreach(value IN LISTS defines)
+  string(APPEND module_cmake " [=[${value}]=]")
+endforeach()
+string(APPEND module_cmake ")\n")
+file(WRITE "${OUT}/../ztrip-runtime-module.cmake" "${module_cmake}")
+
+message(STATUS "Unreal plugin staged in ${OUT}")

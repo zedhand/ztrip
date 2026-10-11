@@ -50,6 +50,9 @@ if(ZTRIP_BUILD_GODOT)
   add_subdirectory(hosts/godot)
 endif()
 
+# The Unreal plugin is built by the engine; this only stages its sources.
+add_subdirectory(hosts/unreal)
+
 include(ZtripInstall)
 include(ZtripPackaging)
 
