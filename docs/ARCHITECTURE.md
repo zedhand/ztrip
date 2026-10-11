@@ -28,7 +28,7 @@ core/            C++20 library, no engine headers
   serialize/     JSON schemas + migrations, sigcache
 hosts/
   godot/         GDExtension (src/), addon + demo Godot project (project/)
-  unreal/        (later) Runtime + Editor modules, Sequencer track, binder
+  unreal/        Unreal plugin: ZtripRuntime (core + player + binder), ZtripEditor (Sequencer tools)
 tools/
   analyze-cli/   offline analysis + plot dump for tuning
 examples/        sample .mgraph.json graphs
@@ -36,7 +36,7 @@ tests/           unit, determinism and analysis accuracy tests (Catch2)
 docs/            ARCHITECTURE.md, DECISIONS.md, node reference
 ```
 
-Core builds with CMake as the static library `ztrip_core` (alias `ztrip::core`). UE links it as a ThirdParty static library through `Build.cs`; Godot links it through godot-cpp.
+Core builds with CMake as the static library `ztrip_core` (alias `ztrip::core`). Godot links it through godot-cpp. Unreal compiles the core's sources inside its ZtripRuntime module (staged by the `ztrip_unreal_plugin` target), so they match the engine's compiler and standard library.
 
 ## Building
 
@@ -109,6 +109,21 @@ Little-endian binary: magic `ZTRSIGC\0`, format version, 64-bit FNV-1a hashes of
 7. **Live mode:** the same nodes with `live` set, no checkpoints; a backwards jump resets state instead of replaying.
 
 `Evaluator::outputs()` lists each `PropertyOut` target and value; `port_value(node, port)` reads any port for previews.
+
+## Host layer
+
+`ztrip::host` (`core/include/ztrip/host/`) holds the engine-free steps every host takes, so hosts stay thin and agree:
+
+- `analysis_cache.hpp`: analyse a WAV with the on-disk `.sigcache`, and the default draft lanes.
+- `session.hpp`: `Session` owns a song's analysis (background, cached), the graph (hot reload, last good graph kept on error), macros that survive reloads, and the timeline (tempo map and Note Sequence from files or drafted). A host supplies the song time and writes `outputs()` to its scene.
+- `bake.hpp`: samples a graph per frame and reduces keys (Douglas-Peucker within a tolerance), for baking to keyframes.
+- `unreal_target.hpp`: the Unreal target syntax.
+
+`tests/test_host.cpp` checks that `Session` gives exactly the values the Godot player's evaluation path gives for the same song and graph.
+
+## Unreal host
+
+`hosts/unreal/` is a UE 5.6+ plugin; see [hosts/unreal/README.md](../hosts/unreal/README.md). `AZtripPlayer` runs a `host::Session`, takes its song time from its own clock or from Sequencer (an animatable `SongTime`), and `FZtripBinder` writes outputs through UE reflection. The editor module sets up Level Sequences and bakes graphs into them. CI has no Unreal Engine, so it builds the staged module's engine-free files as UnrealBuildTool would (`hosts/unreal/check`) and runs the module rules against a stand-in for UnrealBuildTool; the Unreal-facing code is not compiled in CI.
 
 ## Godot host (Phase 3)
 

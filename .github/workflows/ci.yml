@@ -1,7 +1,8 @@
 name: CI
 
 # Every push and pull request builds Linux GCC, Linux Clang and Windows MSVC
-# (Debug and Release) and the Godot host on Linux and Windows. Docs-only
+# (Debug and Release), the Godot host on Linux and Windows, and the Unreal
+# plugin's engine-free parts on Linux and Windows. Docs-only
 # changes skip it, superseded runs are cancelled, and compiles (ccache) and the
 # FetchContent downloads are cached; caches are written from main, which pull
 # requests can read.
@@ -160,3 +161,70 @@ jobs:
           path: |
             hosts/godot/project
             !hosts/godot/project/.godot
+
+  unreal:
+    # No Unreal Engine on free runners: this stages the plugin, builds its
+    # engine-free part the way UnrealBuildTool would (hosts/unreal/check),
+    # runs a song through it, and runs the module rules (*.Build.cs) against
+    # a stand-in for UnrealBuildTool.
+    name: Unreal plugin, engine-free (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux Clang
+            os: ubuntu-24.04
+            cc: clang
+            cxx: clang++
+          - name: Windows MSVC
+            os: windows-2022
+            cc: cl
+            cxx: cl
+    runs-on: ${{ matrix.os }}
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: Install Ninja and ALSA headers
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build libasound2-dev
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: unreal-${{ matrix.os }}
+          max-size: 200M
+          save: ${{ github.event_name != 'pull_request' }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            build/release/_deps
+            !build/release/_deps/*-build
+          key: fetchcontent-release-${{ matrix.os }}-${{ hashFiles('cmake/ZtripDependencies.cmake', 'tests/CMakeLists.txt') }}
+      - name: Stage the plugin
+        run: |
+          cmake --preset release -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+          cmake --build --preset release --target ztrip_unreal_plugin
+      - name: Build the engine-free part
+        run: |
+          cmake -S hosts/unreal/check -B build/unreal-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DZTRIP_UNREAL_PLUGIN=build/release/unreal/Ztrip
+          cmake --build build/unreal-check
+      - name: Run a song through it
+        run: build/unreal-check/ztrip_unreal_check hosts/godot/project/demo/stage.mgraph.json
+      - name: Check the module rules
+        run: dotnet run --project hosts/unreal/check/rules -p:PluginDir="$(pwd -W 2>/dev/null || pwd)/build/release/unreal/Ztrip"
+      - name: Upload the plugin
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztrip-unreal-plugin
+          retention-days: 7
+          path: build/release/unreal/Ztrip

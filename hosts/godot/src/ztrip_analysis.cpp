@@ -2,17 +2,11 @@
 
 #include "convert.h"
 
-#include "ztrip/io/wav.hpp"
-#include "ztrip/serialize/sigcache.hpp"
-
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/core/class_db.hpp>
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
-#include <exception>
-#include <system_error>
 
 namespace ztrip::godot_host {
 
@@ -37,38 +31,7 @@ bool prepare_analysis(const godot::String& path, bool use_cache, AnalysisJob& jo
 }
 
 AnalysisOutcome run_analysis(const AnalysisJob& job) {
-    AnalysisOutcome out;
-    try {
-        const io::AudioBuffer audio = io::parse_wav(job.wav_bytes);
-        const analysis::AnalysisSettings settings;
-        const serialize::SigcacheKey key{analysis::audio_hash(audio), analysis::settings_hash(settings)};
-
-        std::filesystem::path cache;
-        if (!job.cache_dir.empty()) {
-            char name[40];
-            std::snprintf(name, sizeof name, "%016llx.sigcache", static_cast<unsigned long long>(key.audio_hash));
-            cache = job.cache_dir / name;
-            if (auto cached = serialize::read_sigcache(cache, key)) {
-                out.result = std::make_shared<analysis::AnalysisResult>(std::move(*cached));
-                out.from_cache = true;
-                return out;
-            }
-        }
-        out.result = std::make_shared<analysis::AnalysisResult>(analysis::analyze(audio, settings));
-        if (!cache.empty()) {
-            std::error_code ec;
-            std::filesystem::create_directories(job.cache_dir, ec);
-            try {
-                serialize::write_sigcache(cache, key, *out.result);
-            } catch (const std::exception&) {
-                // A cache we can't write only costs a re-analysis next time.
-            }
-        }
-    } catch (const std::exception& e) {
-        out.result.reset();
-        out.error = job.label + ": " + e.what();
-    }
-    return out;
+    return host::analyze_wav(job.wav_bytes, job.cache_dir, job.label);
 }
 
 } // namespace ztrip::godot_host
