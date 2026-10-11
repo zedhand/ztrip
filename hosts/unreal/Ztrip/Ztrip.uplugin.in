@@ -1,0 +1,36 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "@ZTRIP_VERSION_FULL@",
+	"FriendlyName": "ztrip",
+	"Description": "Animates level properties from music: song analysis, Motion Graphs, Sequencer set-up and bake to keyframes.",
+	"Category": "Animation",
+	"CreatedBy": "ztrip contributors",
+	"CreatedByURL": "https://github.com/zedhand/ztrip",
+	"DocsURL": "https://github.com/zedhand/ztrip/tree/main/hosts/unreal",
+	"SupportURL": "https://github.com/zedhand/ztrip/issues",
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"Installed": false,
+	"SupportedTargetPlatforms": ["Win64", "Linux"],
+	"Modules": [
+		{
+			"Name": "ZtripRuntime",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": ["Win64", "Linux"]
+		},
+		{
+			"Name": "ZtripEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": ["Win64", "Linux"]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Niagara",
+			"Enabled": true
+		}
+	]
+}

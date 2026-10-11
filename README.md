@@ -2,7 +2,7 @@
 
 ztrip animates things from music. Point it at a song and it works out the beat, the bars, and when the kick, snare, bass and cymbals hit. A small node graph then turns those signals into motion: lights that flash on the kick, a camera that pushes in on the bass, materials that pulse with the hi-hats. No per-beat keyframing, and scrubbing back and forth through the song always gives the same result.
 
-Under the hood it is an engine-agnostic C++20 core with a Godot 4 addon and an Unreal Engine 5.6+ host planned.
+Under the hood it is an engine-agnostic C++20 core with a Godot 4 addon and an Unreal Engine 5.6+ plugin.
 
 **Beta testers:** start with [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md).
 
@@ -17,7 +17,7 @@ Under the hood it is an engine-agnostic C++20 core with a Godot 4 addon and an U
 | Musical time: Timeline panel in Godot (tempo map, note lanes, draw, nudge, save) | Done (beta) |
 | Live audio input: microphone, loopback, `live-cli`, Godot `live_input` | Done (beta stretch) |
 | Live control input: MIDI, OSC, DMX (Art-Net, sACN), learn, controller profiles | Done (beta stretch) |
-| Unreal Engine plugin | After beta |
+| Unreal Engine plugin: player actor, property binder, Sequencer set-up and bake ([hosts/unreal/README.md](hosts/unreal/README.md)) | Early beta, not yet compiled against the engine |
 
 Platforms: Windows 11 and Linux.
 
@@ -82,6 +82,7 @@ ev.bind_sequence("main", &seq);
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): data flow, analysis pipeline, graph evaluation, file formats
 - [NODES.md](docs/NODES.md): Motion Graph node reference
 - [hosts/godot/README.md](hosts/godot/README.md): the Godot addon
+- [hosts/unreal/README.md](hosts/unreal/README.md): the Unreal plugin
 - [DECISIONS.md](docs/DECISIONS.md): design decisions and why
 - [RELEASING.md](docs/RELEASING.md): versioning, beta downloads and cutting a release
 - [CONTRIBUTING.md](CONTRIBUTING.md): reporting bugs and sending changes
