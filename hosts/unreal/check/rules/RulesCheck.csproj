@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles the staged plugin's *.Build.cs files against a stand-in for
+       the parts of UnrealBuildTool they use, and runs them. Pass
+       -p:PluginDir=<staged Ztrip folder>. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="UnrealBuildToolStub.cs;Program.cs" />
+    <Compile Include="$(PluginDir)/Source/*/*.Build.cs" />
+  </ItemGroup>
+</Project>

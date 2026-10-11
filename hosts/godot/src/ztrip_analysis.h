@@ -2,6 +2,7 @@
 #pragma once
 
 #include "ztrip/analysis/offline.hpp"
+#include "ztrip/host/analysis_cache.hpp"
 
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
@@ -24,11 +25,7 @@ struct AnalysisJob {
     std::string label;               // the file, for messages
 };
 
-struct AnalysisOutcome {
-    std::shared_ptr<const analysis::AnalysisResult> result; // null on failure
-    bool from_cache = false;
-    std::string error;
-};
+using AnalysisOutcome = host::AnalysisOutcome;
 
 // Reads the file (res://, user:// or absolute) on the calling thread. Returns
 // false with `error` set when it can't be read.
