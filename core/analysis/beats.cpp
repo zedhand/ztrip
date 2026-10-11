@@ -269,7 +269,7 @@ int estimate_downbeat_phase(const Spectrogram& spec, std::span<const double> bea
     return best_phase;
 }
 
-DrumFit drum_fit(std::span<const double> beats, std::span<const Trigger> hits) {
+DrumFit drum_fit(std::span<const double> beats, std::span<const Trigger> hits, bool count_off_beats) {
     DrumFit fit;
     if (beats.size() < 4 || hits.empty()) return fit;
     std::vector<double> ibi(beats.size() - 1);
@@ -289,6 +289,9 @@ DrumFit drum_fit(std::span<const double> beats, std::span<const Trigger> hits) {
         double d = std::numeric_limits<double>::infinity();
         if (it != beats.end()) d = *it - h.time;
         if (it != beats.begin()) d = std::min(d, h.time - *(it - 1));
+        if (count_off_beats && it != beats.end() && it != beats.begin()) {
+            d = std::min(d, std::fabs(h.time - 0.5 * (*it + *(it - 1))));
+        }
         if (d <= tol) on_beat += h.velocity;
     }
     if (times.empty() || total <= 0.0) return fit;
@@ -321,16 +324,24 @@ BeatGrid analyze_beats(const Spectrogram& spec, std::span<const float> onset_str
         // tracked on the plain onset strength so each gets the same footing.
         BeatSettings check = settings;
         check.tightness = settings.check_tightness;
-        const DrumFit base = drum_fit(track_beats(onset_strength, fr, tempo, check), drum_hits);
-        double best_f = base.f;
+        // Octave candidates (x1/2, x2) are scored on hits that land on a
+        // beat. The x2/3 and x3/2 ones also count hits halfway between beats:
+        // a fast metal beat puts half its kicks on the eighths, and only the
+        // true tempo lines up with both those and the snares.
+        const std::vector<double> base_beats = track_beats(onset_strength, fr, tempo, check);
+        const DrumFit base = drum_fit(base_beats, drum_hits);
+        const DrumFit base_eighths = drum_fit(base_beats, drum_hits, true);
+        double best_gain = 0.0;
         const double estimate = tempo;
         for (const double m : {0.5, 2.0 / 3.0, 1.5, 2.0}) {
             const double candidate = estimate * m;
             if (candidate < settings.min_bpm || candidate > settings.max_bpm) continue;
-            const DrumFit fit = drum_fit(track_beats(onset_strength, fr, candidate, check), drum_hits);
+            const bool eighths = m == 2.0 / 3.0 || m == 1.5;
+            const DrumFit fit = drum_fit(track_beats(onset_strength, fr, candidate, check), drum_hits, eighths);
+            const double gain = fit.f - (eighths ? base_eighths.f : base.f);
             if (fit.f >= settings.min_drum_fit && fit.precision >= settings.min_drum_precision &&
-                fit.f - base.f >= settings.drum_fit_margin && fit.f > best_f) {
-                best_f = fit.f;
+                gain >= settings.drum_fit_margin && gain > best_gain) {
+                best_gain = gain;
                 tempo = candidate;
             }
         }

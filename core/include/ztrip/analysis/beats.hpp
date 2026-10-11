@@ -62,13 +62,14 @@ int estimate_downbeat_phase(const Spectrogram& spec, std::span<const double> bea
 
 // How well a beat grid matches drum hits: precision is the share of beats
 // with a hit within the tolerance (min(50 ms, period / 6)), recall the share
-// of hit velocity that lands on a beat, f their harmonic mean.
+// of hit velocity that lands on a beat (or, with count_off_beats, halfway
+// between two beats), f their harmonic mean.
 struct DrumFit {
     double f = 0.0;
     double precision = 0.0;
     double recall = 0.0;
 };
-DrumFit drum_fit(std::span<const double> beats, std::span<const Trigger> hits);
+DrumFit drum_fit(std::span<const double> beats, std::span<const Trigger> hits, bool count_off_beats = false);
 
 // Full offline beat grid: tempo, beats and downbeats. With drum hits (kicks
 // and snares together), the tempo estimate is checked against its related
