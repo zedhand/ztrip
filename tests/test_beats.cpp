@@ -59,6 +59,9 @@ TEST_CASE("drum_fit scores beats on the hits, not between them", "[beats]") {
     }
     CHECK(drum_fit(beats, on).f == Catch::Approx(1.0));
     CHECK(drum_fit(beats, between).f == 0.0);
+    // Counting off-beats credits the eighths but still needs hits on beats.
+    CHECK(drum_fit(beats, between, true).recall == Catch::Approx(15.0 / 16.0)); // the last one has no beat after it
+    CHECK(drum_fit(beats, between, true).precision == 0.0);
     CHECK(drum_fit(beats, {}).f == 0.0);
 }
 
@@ -77,6 +80,28 @@ TEST_CASE("a fast rock groove is read at the drummer's tempo, not half of it", "
         if (b % 2 == 0) ztrip::test::add_kick(x, sr, t, 0.8f);
         else ztrip::test::add_snare(x, sr, t, noise, 0.6f);
         ztrip::test::add_hat(x, sr, t, noise);
+    }
+    const auto grid = analyze(x, sr, {}).beats;
+    INFO("-> " << grid.bpm << " BPM");
+    CHECK(grid.bpm == Catch::Approx(bpm).epsilon(0.01));
+}
+
+TEST_CASE("a metal beat with kicks on the eighths is read at 180, not 120", "[beats]") {
+    // Snare on 2 and 4, kick on the "and" of every beat plus beat 1, eighth
+    // hats, and a muted guitar chugging eighths, as in reference track 04.
+    const int sr = 44100;
+    const double bpm = 180.0;
+    const double spb = 60.0 / bpm;
+    const int beats = 160;
+    std::vector<float> x(static_cast<std::size_t>((beats * spb + 1.0) * sr), 0.0f);
+    ztrip::test::Noise noise(11);
+    for (int b = 0; b < beats; ++b) {
+        const double t = 0.3 + b * spb;
+        if (b % 2 == 1) ztrip::test::add_snare(x, sr, t, noise, 0.7f);
+        if (b % 4 == 0) ztrip::test::add_kick(x, sr, t, 0.8f);
+        ztrip::test::add_kick(x, sr, t + spb / 2, 0.8f);
+        ztrip::test::add_hat(x, sr, t, noise);
+        ztrip::test::add_hat(x, sr, t + spb / 2, noise);
     }
     const auto grid = analyze(x, sr, {}).beats;
     INFO("-> " << grid.bpm << " BPM");
